@@ -248,7 +248,7 @@ class cINNConfig():
                     'architecture': 'cINN', # DEPREACATED (not used anymore, but leave to read old configs)
                     'FrEIA_ver': 0.2, # version of FrEIA (2022.1.10: 0.1 or 0.2) (2023.08.10. DEPRECATED)
                     }
-}
+
     
     # parameters to be set
     __cINN_parameter_arg = {**__data_param, **__dependent_param,  **__setting_param}
