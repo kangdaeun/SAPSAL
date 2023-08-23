@@ -352,11 +352,11 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
         
 ############################################################################
 title_unit_dic = {
-    'logTeff': "log T$_{\mathrm{eff}}$ [K]",
-    'Teff': 'T$_{\mathrm{eff}}$ [K]',
-    'logG': 'log g [cm s$^{-2}$]',
-    'A_V': 'A$_{\mathrm{V}}$ [mag]',
-    'veil_r': 'Veiling factor',
+    'logTeff': "log T$_{\mathrm{eff}}$ (K)",
+    'Teff': 'T$_{\mathrm{eff}}$ (K)',
+    'logG': 'log g (cm s$^{-2}$)',
+    'A_V': 'A$_{\mathrm{V}}$ (mag)',
+    'veil_r': 'r$_{\mathrm{veil}}$',
     'library': 'Library',
     "R_V": 'R$_{\mathrm{V}}$',
 }
@@ -367,7 +367,7 @@ title_dic = {
     'logG': 'log g',
     'A_V': 'A$_{\mathrm{V}}$',
     'library': 'Library',
-    'veil_r': 'Veiling factor',
+    'veil_r': 'r$_{\mathrm{veil}}$',
     "R_V": 'R$_{\mathrm{V}}$',
     
     'tT': 'T$_{\mathrm{eff}}^{\mathrm{True}}$',
