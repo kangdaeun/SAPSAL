@@ -7,6 +7,8 @@ Created on Mon Mar 20 13:57:31 2023
 
 fit posterior : CPU
 
+Run directory : no matter
+
 1) read posterior files (do not run posterior here)
     - posterior filename format should be: post_XXXXXX.dat
 2) fit 1D posterior distributions with Gaussians max. 6
@@ -395,6 +397,10 @@ if __name__=='__main__':
                 ax.yaxis.set_major_locator(ticker.MaxNLocator(2))
                 ax.tick_params(axis='y', labelsize=yticksize)
                 ax.tick_params(axis='x', labelsize=xticksize)
+                
+            if i_param+1 < len(axis):
+                for jj in range(i_param+1, len(axis)):
+                    axis[jj].axis("off")
         
     
         if save_figure:
@@ -406,7 +412,7 @@ if __name__=='__main__':
         for i, p in enumerate(fit_info):
             fit_params[:len(p), i] = p
         fit_params=Table(fit_params, names=params_to_fit)
-        ascii.write(fit_params, param_file, format='commented_header', delimiter='\t')
+        ascii.write(fit_params, param_file, format='commented_header', delimiter='\t', overwrite=True)
         
         print('Finished model: ',pfile_name)
             

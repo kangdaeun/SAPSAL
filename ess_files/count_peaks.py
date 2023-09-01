@@ -376,6 +376,11 @@ if __name__=='__main__':
                 ax.tick_params(axis='x', labelsize=xticksize)
                 ax.xaxis.set_major_locator(ticker.MaxNLocator(3))
                 
+#         if plot_figure:
+#             if i_param+1 < len(axis):
+#                 for jj in range(i_param+1, len(axis)):
+#                     axis[jj].axis("off")
+                
                 
         nmode_table.append(n_mode)
         nvpeak_table.append(n_vpeaks)
@@ -383,6 +388,10 @@ if __name__=='__main__':
              
                 
         if plot_figure:
+            if i_param+1 < len(axis):
+                for jj in range(i_param+1, len(axis)):
+                    axis[jj].axis("off")
+            
             if save_figure:
                 fig_file = save_dir + 'figs/Countfig_'+file_code+'.png'
                 fig.savefig(fig_file, dpi=250)
@@ -397,9 +406,9 @@ if __name__=='__main__':
         nvpeak_table[param] = nmode_table[param]
         nspeak_table[param] = nmode_table[param]
         
-    ascii.write(nmode_table, save_dir + 'nmode_table.txt', format='commented_header', delimiter='\t')
-    ascii.write(nvpeak_table, save_dir + 'nvpeak_table.txt', format='commented_header', delimiter='\t')
-    ascii.write(nspeak_table, save_dir + 'nspeak_table.txt', format='commented_header', delimiter='\t')
+    ascii.write(nmode_table, save_dir + 'nmode_table.txt', format='commented_header', delimiter='\t', overwrite=True)
+    ascii.write(nvpeak_table, save_dir + 'nvpeak_table.txt', format='commented_header', delimiter='\t', overwrite=True)
+    ascii.write(nspeak_table, save_dir + 'nspeak_table.txt', format='commented_header', delimiter='\t', overwrite=True)
     
     t_end = time()
     print('Finished (%.2f min)'%( (t_end-t_start)/60. ))   
