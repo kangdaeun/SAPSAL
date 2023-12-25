@@ -64,8 +64,8 @@ import cINN_set.tools.test_tools as test_tools #combine_multiple_evaluations
 ## Setup ##
 ###########
 
-N_RAND = 50                         # Number of random configs to generate
-SEED = 25011133                       # Random seed for config randomisation # 25011132               
+N_RAND = 100                         # Number of random configs to generate
+SEED = 25081136                       # Random seed for config randomisation # 25011132               
 
 N_PROCESSES = 15              # Number of multiple processes
 
@@ -101,15 +101,15 @@ SEARCH_PARAMETERS = {
     "n_blocks" : (np.random.randint, {"low":8, "high":24+1}),
     "internal_layer": (np.random.randint, {"low":3, "high":9+1}),
     # "batch_size" : (tools.rand_in_log2, {"a":8 ,"b":9}),
-    "internal_width" : (tools.rand_in_log2, {"a":8 ,"b":9}), # usually fixed to 256
+    "internal_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 256
     "feature_layer": (np.random.randint, {"low":3, "high":9+1}), # usually fixed to 3 (for Noise 3~9+1) (for Normal 3~5+1)
-    "feature_width" : (tools.rand_in_log2, {"a":8 ,"b":9}), # usually fixed to 512
+    "feature_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 512
     # "n_its_per_epoch" : (tools.rand_in_log2, {"a":8, "b":10}),
     # "fcl_internal_size" : (tools.rand_in_log2, {"a":7, "b":11}), 
 #    "scale_data" : (tools.rand_bool, {}),
     # "do_rev" : (tools.rand_bool, {}),
 #    "use_feature_net" : (tools.rand_bool, {}),
-    "y_dim_features" : (tools.rand_in_log2, {"a":6, "b":10}),
+    "y_dim_features" : (tools.rand_in_log2, {"a":6, "b":11}),
     "seed_weight_init" : (np.random.randint, {"low":1, "high":241542})
     }
 

@@ -611,7 +611,7 @@ from mpl_toolkits.axes_grid1 import make_axes_locatable
 import copy
 
 def plot_posterior(posterior, axis, c, 
-                   x_true=None, plot_true=True, nbin=100, xranges_dic=None,
+                   x_true=None, plot_true=True, nbin=100, xranges_dic=None, return_xranges_dic=False,
                     color_post = 'gray', alpha=0.4, text_true=True,
                      map_values=None, plot_map=True, color_map='orange', text_map=True, 
                      u68_values = None, calculate_u68=True,  text_u68=True, additional_text=None,
@@ -662,6 +662,9 @@ def plot_posterior(posterior, axis, c,
             
         else:
             text_u68 = False
+            
+    if return_xranges_dic==True and xranges_dic == None:
+        xranges_dic = {}
     
 
     for i_param, param in enumerate(c.x_names):
@@ -697,6 +700,8 @@ def plot_posterior(posterior, axis, c,
 
         yhis, _xhis = np.histogram(post, bins=bins, density=True, range=xrange)
         xhis = 0.5*(_xhis[:-1]+_xhis[1:])
+        if return_xranges_dic:
+            xranges_dic[param] = [min(_xhis), max(_xhis)]
                        
         
         ax = axis[i_param]
@@ -758,10 +763,58 @@ def plot_posterior(posterior, axis, c,
         ax.set_ylabel(ylabel, fontsize=ylabelsize)
         ax.tick_params(axis='y',which='major',labelsize=yticklabelsize)
         ax.tick_params(axis='x',which='major',labelsize=xticklabelsize)
+    
+    if return_xranges_dic:
+        return xranges_dic
         
+        
+def overplot_posterior(posterior, axis, c, nbin=100, hratio=0.5, ls=':', color_post='C0', alpha=0.4,
+                       xranges_dic=None,legend_label=None, plot_legend=True, legend_size='small', **kwarg):
+    
 
+    for i_param, param in enumerate(c.x_names):
+      
+      post = posterior[:, i_param].copy() # 1D
+            
+      # Histogram plot
+      bins = nbin
+      labels = None
+      
+      # 2. calculate histogram
+      xrange = None
+      if xranges_dic is not None:
+          if param in xranges_dic:
+              xrange = xranges_dic[param]
 
+      yhis, _xhis = np.histogram(post, bins=bins, density=True, range=xrange)
+      xhis = 0.5*(_xhis[:-1]+_xhis[1:])
+      yhis = yhis * hratio
+      
+      ax = axis[i_param]
+      # return previous axis
+      xr = ax.get_xlim()
+      yr = ax.get_ylim()
+      
+      if labels:
+          ax.bar(np.arange(len(yhis))+1, yhis , label=legend_label, color=color_post)
+          
+          ax.set_xticks(np.arange(len(yhis))+1)
+          ax.set_xticklabels(labels)
 
+      else:
+          ax.step(xhis, yhis, where='mid', color=color_post, ls=ls)
+          ax.fill_between(xhis, yhis, color=color_post, alpha=alpha, label=legend_label)
+          
+      ax.set_xlim(xr)
+      ax.set_ylim(yr)
+          
+          
+      if i_param==0 and plot_legend==True:
+          # if ax.get_legend():
+          ax.legend(loc='best', fontsize=legend_size)
+          
+    
+    
 
 # plot useful scatter plots
 def set_basic(ax, xrange=None, yrange=None,xlabel=None, ylabel=None, title=None, 
