@@ -40,7 +40,7 @@ parser.add_argument('-o','--outputdir', required=False, default=None, help="Outp
 parser.add_argument('-r','--resume', required=False, default=None, help="Resume Hyperparameter search or not (T/F)")
     
 """
-#%%
+
 import numpy as np
 import os, glob
 import pandas as pd
@@ -58,7 +58,7 @@ from cINN_set.cINN_config import read_config_from_file
 
 import cINN_set.tools.hs_tools as tools
 import cINN_set.tools.test_tools as test_tools #combine_multiple_evaluations
-#%%
+
 
 ###########
 ## Setup ##
@@ -67,13 +67,13 @@ import cINN_set.tools.test_tools as test_tools #combine_multiple_evaluations
 N_RAND = 100                         # Number of random configs to generate
 SEED = 25081136                       # Random seed for config randomisation # 25011132               
 
-N_PROCESSES = 15              # Number of multiple processes
+N_PROCESSES = 1             # Number of multiple processes
 
 OUTPUT_DIR = "HP_search_random/"    # Path to output directory
 OUTPUT_SUFFIX = "HP_NET"           # Optional suffix for all output files (can change by option argument)
 
 
-DEVICE = 'cuda'              # Device to run search on, either 'cuda' or 'cpu'
+DEVICE = 'mps'              # Device to run search on, either 'cuda' or 'cpu'
 GPU_MAX_LOAD = 0.1          # Maximum compute load of GPU allowed in automated selection
 GPU_MAX_MEMORY = 0.1         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
@@ -88,7 +88,7 @@ RESUME = False          # Switch to resume a previous hyperparameter search
 SAVE_PLOT_COPY = True  # copy plots 
 
 
-#%%
+
 
 # Dictionary with the config parameters to randomize, the way to randomize them
 # and parameters to the randomisation function
@@ -137,7 +137,7 @@ def change_gpu_exclude_ids(num, add=None, remove=None):
         except:
             print("num not in GPU_EXCLUDE_IDS")
 
-#%%        
+    
 def update_config_table(config, n):
     
     config_df_path = OUTPUT_DIR + "Config_table_%s.csv" % OUTPUT_SUFFIX
@@ -195,7 +195,7 @@ def make_random_config(c_ref, n):
 
     return config
     
-#%%    
+#%%   
 def set_device(config):
     # Find a free GPU to run on if DEVICE == cuda
     if "cuda" in config.device:
@@ -213,6 +213,7 @@ def set_device(config):
     
     return device_id
 
+# not actually used now
 def check_device(device_id):
     # check current is still available
     exclude_id = [i for i in GPU_EXCLUDE_IDS]
@@ -310,7 +311,8 @@ def evaluate_network(config, logfile=None):
         f_eval_log.close()
  
 #%%
-def run_all(c_ref, n, **kwargs): # not actually used
+# not actually used
+def run_all(c_ref, n, **kwargs): 
     
     """
     Parameters
@@ -359,6 +361,7 @@ def prepare_config(c_ref, n):
         # print(GPU_EXCLUDE_IDS)
     return config
 
+# Currently Used
 def train_and_eval(config):
     """
     Set of training and evaluation. If RESUME, check status and run

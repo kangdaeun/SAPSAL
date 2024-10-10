@@ -114,6 +114,26 @@ def calculate_z(model, astro, smoothing=True):
         xT = torch.Tensor(x_test).to(astro.device)
         yT = torch.hstack((torch.Tensor(y_test), torch.Tensor(astro.flag_to_rf(f_test)))).to(astro.device)
         
+    elif astro.wavelength_coupling == True:
+        test, train = astro.get_splitted_set(rawval=False, smoothing=smoothing,
+                                             smoothing_sigma=astro.smoothing_sigma,
+                                             normalize_flux=astro.normalize_flux, 
+                                             normalize_total_flux=astro.normalize_total_flux, 
+                                             normalize_mean_flux=astro.normalize_mean_flux,
+                                             veil_flux = veil_flux, extinct_flux = extinct_flux, 
+                                             random_seed=0,
+                                             )
+        x_test, y_test = test[0], test[1]
+
+        wl_test = astro.create_coupling_wavelength(y_test.shape[0]) 
+        # Transform to rescaled: wl - lambda & torch Tensor
+        lam = astro.wl_to_lambda(wl_test)
+        # permute (flux and wl together)
+        perm = np.random.permutation(y_test.shape[1])
+        y_test = torch.hstack( (torch.Tensor(y_test[:,perm]), torch.Tensor(lam[:,perm])) )
+        # device
+        xT, yT = torch.Tensor(x_test).to(astro.device), y_test.to(astro.device)
+
     
     else:
         test, train = astro.get_splitted_set(rawval=False, smoothing=smoothing,

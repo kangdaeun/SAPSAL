@@ -203,6 +203,11 @@ def add_veil(wl, fl, veil):
 def get_muse_wl():
     return np.arange(4750.1572265625, 9351.4072265625, 1.25) #from f20 (3681)
     
+
+def get_coupling_wavelength(y_names):
+    return get_muse_wl()[np.array([int(k[1:]) for k in y_names])]
+    # wl = get_muse_wl()[np.array([int(i[1:]) for i in y_names])]
+    # return np.repeat(wl.reshape(1,-1), N_data, axis=0)
     
 
 from cINN_set.execute import get_posterior as get_post
@@ -231,6 +236,13 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
 
             rf = astro.flag_to_rf(flag2d)
             y_it = np.hstack((y2d, rf))
+
+    if astro.wavelength_coupling == True:
+        wl = get_coupling_wavelength(astro.y_names)
+        if len(y.shape)>1: 
+            wl = np.repeat(wl.reshape(1,-1), y.shape[0], axis=0)
+        y_it = np.hstack( (y_it, astro.wl_to_lambda(wl)))
+
             
     
     if use_group:

@@ -848,6 +848,13 @@ if __name__=='__main__':
         DEVICE_ID = DEVICE_ID_LIST[0]
         c.device = 'cuda:{:d}'.format(DEVICE_ID)
     
+    if 'mps' in c.device: # request to use MAC GPU
+        # CPU will be used if MPS is not available, assuming you are running on MAC
+        if torch.backends.mps.is_available() * torch.backends.mps.is_built():
+            c.device = 'mps'
+        else:
+            c.device = 'cpu'
+    
     _ = torch.Tensor([0]).to(c.device)
     astro.device = c.device
    

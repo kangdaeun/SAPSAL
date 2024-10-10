@@ -289,6 +289,12 @@ class DataLoader(cINNConfig):
         if self.use_flag:
             self.mu_f = np.zeros(len(self.flag_names)) + 0.5*(0 + 1)
             self.w_f = np.diag( 1/( np.zeros(len(self.flag_names)) + abs(1-0)/np.sqrt(12) ) )
+
+        if self.wavelength_coupling:
+            wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in self.y_names])] # 아직 get_coupling_wavelength는 안써보기로
+            data = np.random.choice(wl, len(wl)*1000)
+            self.mu_wl = np.zeros(len(self.y_names)) + np.mean(data)
+            self.w_wl =  np.diag( 1/( np.zeros(len(self.y_names)) + np.std(data) ) )
             
                     
     # differce to extract_ is this can preprocess , rescale the data if you want    
@@ -407,3 +413,15 @@ class DataLoader(cINNConfig):
         size = (N_data, len(self.flag_names))
         
         return np.random.randint(low=0, high=2, size=size)
+
+    def create_coupling_wavelength(self, N_data):
+        """
+        Create wavelength corresponding to the flux
+        """
+        wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in self.y_names])]
+        return np.repeat(wl.reshape(1,-1), N_data, axis=0)
+
+
+
+
+

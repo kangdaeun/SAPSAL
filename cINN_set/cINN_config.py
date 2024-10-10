@@ -217,6 +217,11 @@ class cINNConfig():
                     # Randomizing parameter on the fly
                     'random_parameters': None, # dictionary
                     'additional_kwarg': None, # dictionary : currently used for: Rv
+
+                    # New: Coupling data [TEST]
+                    'wavelength_coupling': False, #T/F
+
+
                     
                     # train_noisy_obs deprecated
                     # 'train_noisy_obs': False,
@@ -273,8 +278,9 @@ class cINNConfig():
     # these are added later. don't want to print.
     __hidden_parameter = {
                         'mu_x': None, 'mu_y': None, 'w_x': None, 'w_y': None,   # rescale parameters 
-                        'mu_s':None, 'w_s':None, 
+                        'mu_s':None, 'w_s':None, # Noise-Net, sigma
                         'mu_f':None, 'w_f':None, # rescale params for flag
+                        'mu_wl':None, 'w_wl':None, # wavelength coupling
                         'network_model': None,
                             }
         
@@ -314,7 +320,7 @@ class cINNConfig():
         if self.y_names is not None:
             self.y_dim_in = len(self.y_names)
             if self.prenoise_training==True:
-                self.y_dim_in *= 2
+                self.y_dim_in += len(self.y_names)
             if self.use_flag==True:
                 # add auto attr and update dimension
                 self.flag_names = list(self.flag_dic.keys())
@@ -322,6 +328,9 @@ class cINNConfig():
                 for key, names in self.flag_dic.items():
                     self.flag_index_dic[key] = [self.y_names.index(name) for name in names]
                 self.y_dim_in += len(self.flag_names)
+            if self.wavelength_coupling==True:
+                self.y_dim_in += len(self.y_names)
+
             
     def update_proj_dir(self, change_filename=True, change_tablename=True): #, change_expander=True): # expander deprecated
         projdir = self._projdir
@@ -358,6 +367,11 @@ class cINNConfig():
         if self.use_flag:
             self.mu_f = state_dicts['rescale_params']['mu_f']#.astype(np.float32)
             self.w_f = state_dicts['rescale_params']['w_f']#.astype(np.float32)
+
+        if self.wavelength_coupling:
+            self.mu_wl = state_dicts['rescale_params']['mu_wl']#.astype(np.float32)
+            self.w_wl = state_dicts['rescale_params']['w_wl']#.astype(np.float32)
+        
     
     
     def obs_to_y(self, observations):
@@ -388,6 +402,13 @@ class cINNConfig():
     
     def rf_to_flag(self, rfs):
         return np.dot(rfs, np.linalg.inv(self.w_f)) + self.mu_f
+    
+
+    def wl_to_lambda(self, wavelength):
+        return np.dot(wavelength - self.mu_wl, self.w_wl)
+    
+    def lambda_to_wl(self, lambdas):
+        return np.dot(lambdas, np.linalg.inv(self.w_wl)) + self.mu_wl
     
     """
     
@@ -747,6 +768,12 @@ class cINNConfig():
                 contents.append( 'flag_dic = '+'\n\t'.join(txt))
             else:
                 contents.append(simple_sentence(self, "flag_dic"))
+        new_line(contents)
+
+        # if you use wavelength coupling
+        contents.append('# Network with wavelength coupling')
+        contents.append(simple_sentence(self, "wavelength_coupling") )
+        new_line(contents)
             
         
         # ============ parameters in cNN_parameters.py ===========

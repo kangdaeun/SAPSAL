@@ -470,7 +470,7 @@ def train_prenoise_network(c, data=None, verbose=True, max_epoch=1000): # c is c
         while (training_status == 0 and i_epoch < max_epoch-1):
             i_epoch += 1
             
-            test_loader, train_loader = data.get_loaders()
+            test_loader, train_loader = data.get_loaders(param_seed = i_epoch) # param_seed will randomize parameter if random_parameters is set
         
             data_iter = iter(train_loader)
             test_iter = iter(test_loader)
@@ -1091,7 +1091,7 @@ def train_flag_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNC
             i_epoch += 1
         # for i_epoch in range(-c.pre_low_lr, c.n_epochs):
             
-            test_loader, train_loader = data.get_loaders()
+            test_loader, train_loader = data.get_loaders(param_seed = i_epoch) # param_seed will randomize parameter if random_parameters is set
         
             data_iter = iter(train_loader)
             test_iter = iter(test_loader)
@@ -1335,6 +1335,346 @@ def train_flag_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNC
     except:
         model.save(c.filename + '_ABORT')
         # loss_array = np.array(epoch_loss_history)
+        if len(epoch_loss_history) > 10:
+            fig, ax = plot_loss_curve_2types(
+                                    epoch_loss_history['Epoch'][:i_epoch+1],
+                                    epoch_loss_history['Loss_train_mn'][:i_epoch+1],
+                                    epoch_loss_history['Loss_test_mn'][:i_epoch+1],
+                                    epoch_loss_history['Loss_train_mdn'][:i_epoch+1],
+                                    epoch_loss_history['Loss_test_mdn'][:i_epoch+1],
+                                    c=c, 
+                                      figname=c.filename+'_ABORT_Loss_plot.pdf',#여기도 주의
+                                     title=os.path.basename(c.config_file).replace('.py',''))
+        raise
+    
+    t_end = time()
+    print('Time taken for training: {:.1f} hour ({:.1f} min)'.format( (t_end-t_start)/3600, (t_end-t_start)/60 ) )
+
+    
+
+
+"""
+Train normal net with wavelength coupling
+"""
+
+def train_wc_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNConfig class variable
+
+    t_start = time()
+
+    # print all parameters in the config
+    if verbose:
+        config_str = ""
+        config_str += "==="*30 + "\n"
+        config_str += "Config options:\n\n"
+
+        print_list = c.parameter_list
+        if len(c.x_names) > 20: print_list.remove('x_names')
+        if len(c.y_names) > 20: print_list.remove('y_names')
+        
+        for param in print_list:
+            if getattr(c, param) is not None:
+                config_str += "  {:25}\t{}\n".format(param, getattr(c, param))
+
+        config_str += "==="*30 + "\n"
+        print(config_str)
+  
+    model = eval(c.model_code)(c)
+    
+    # make savedir
+    if (not os.path.exists( os.path.dirname(c.filename) )) and ( os.path.dirname(c.filename)!= '' ):
+        os.system('mkdir -p '+os.path.dirname(c.filename))
+        
+    # make viz
+    if verbose:
+        viz = TrainVisualizer(c)
+        if c.live_visualization:
+            viz.visualizer.viz.text('<pre>' + config_str + '</pre>')
+            running_box = viz.visualizer.viz.text('<h1 style="color:red">Running</h1>')
+           
+        
+    if c.load_file:
+        model.load(c.load_file, device=c.device)
+        
+        
+    def sample_z(sigma):
+    #    return sigma * torch.cuda.FloatTensor(c.batch_size, c.x_dim).normal_()
+        return sigma * torch.FloatTensor(c.batch_size, c.x_dim).normal_().to(c.device)
+    
+    try:
+        epoch_loss_history = []
+        
+        # 저장해야할 것. 저장은 항상하고 그외에 다루는 걸 config가 조절해야
+        # Loss_train_mn, Loss_test_mn, Loss_train_mdn, Loss_test_mdn
+        # L_rev_train_mn, L_rev_test_mn, L_rev_train_mdn, L_rev_test_mdn
+        loss_header = ['Epoch']
+        loss_header +=['Loss_train_mn', 'Loss_test_mn', 'Loss_train_mdn', 'Loss_test_mdn']
+        # if c.do_rev:
+        loss_header += ['L_rev_train_mn', 'L_rev_test_mn', 'L_rev_train_mdn', 'L_rev_test_mdn']
+
+        loss_format = ['int32'] + ['float32']*len(loss_header)
+        epoch_loss_history = np.zeros(max_epoch, 
+                                          dtype={'names':loss_header, 'formats':loss_format} )
+        epoch_loss_history['Epoch'] = np.arange(max_epoch)
+        
+        if data is None:
+            data = DataLoader(c, update_rescale_parameters=True)
+        
+        if model.rescale_params is None:
+            # pass rescale parameter information
+#             model.rescale_params = {'mu_x': data.mu_x, 'mu_y':data.mu_y, 'w_x':data.w_x, 'w_y':data.w_y}
+            model.rescale_params = {'mu_x': data.mu_x, 'mu_y':data.mu_y, 'w_x':data.w_x, 'w_y':data.w_y, 'mu_wl': data.mu_wl, 'w_wl': data.w_wl}
+            
+        
+        ########
+        # training status: -1, 0 or 1
+        # 0: training in progress (not converged, not diverged)
+        # 1: training converged (both train set and test set converged)
+        # -1: training diverged (either train set or test set diverged)
+        training_status = 0
+        i_epoch = -c.pre_low_lr - 1
+        
+        name_check_train = 'Loss_train_mdn'
+        name_check_test = 'Loss_test_mdn'
+        
+        while (training_status == 0 and i_epoch < max_epoch-1):
+            i_epoch += 1
+            # rawval=False
+            test_loader, train_loader = data.get_loaders(param_seed = i_epoch) # param_seed will randomize parameter if random_parameters is set
+        
+            data_iter = iter(train_loader)
+            test_iter = iter(test_loader)
+    
+            loss_history = [] # save loss for all batches
+            test_loss_history = []
+            
+            if i_epoch < 0:
+                for param_group in model.optim.param_groups:
+                    param_group['lr'] = c.lr_init * 2e-2
+                    
+            # Loop for train_loader, Optimization
+            for i_batch, data_tuple in tqdm.tqdm(enumerate(data_iter),
+                                                  total=min(len(train_loader), c.n_its_per_epoch),
+                                                  leave=False,
+                                                  mininterval=1.,
+                                                  disable=(not c.progress_bar),
+                                                  ncols=83):
+                
+                # In wavelength coupling mode (wavelength_coupling=True), data are normalized, torch Tensor
+                # Only thing to do is add wavelength -> permute Y and WL in the same order -> transform wl to lambda -> make torch Tensor -> attach y and lambda
+                x, y = data_tuple
+                
+                wl = data.create_coupling_wavelength(y.shape[0]) 
+                # Transform to rescaled: wl - lambda & torch Tensor
+                lam = torch.Tensor(data.wl_to_lambda(wl))
+                # permute (flux and wl together)
+                perm = torch.randperm(y.shape[1])
+                y = torch.hstack( (y[:,perm], lam[:,perm]) )
+                # device
+                x, y = x.to(c.device), y.to(c.device)
+                
+                
+                features = model.cond_net.features(y)
+                
+                output, jac = model.model(x, features)
+    
+                zz = torch.sum(output**2, dim=1)
+    
+                neg_log_likeli = 0.5 * zz - jac
+    
+                l = torch.mean(neg_log_likeli)
+                l.backward(retain_graph=c.do_rev)
+    
+                if c.do_rev:
+                    samples_noisy = sample_z(c.latent_noise) + output.data
+                    # original code raised AssertionError (no condition input)
+                    # x_rec = model.model(samples_noisy, rev=True)
+                    x_rec, _ = model.model(samples_noisy, features, rev=True)
+                    l_rev = torch.mean( (x-x_rec)**2 )
+                    l_rev.backward()
+                else:
+                    l_rev = dummy_loss()
+    
+                model.optim_step()
+                loss_history.append([l.item(), l_rev.item()])
+    
+                if i_batch+1 >= c.n_its_per_epoch:
+                    # somehow the data loader workers don't shut down automatically
+                    try:
+                        data_iter._shutdown_workers()
+                    except:
+                        pass
+    
+                    break
+        
+            # Loop for test_loader, Get loss for test set
+            for i_batch, test_tuple in tqdm.tqdm(enumerate(test_iter),
+                                                  total=min(len(test_loader), c.n_its_per_epoch),
+                                                  leave=False,
+                                                  mininterval=1.,
+                                                  disable=(not c.progress_bar),
+                                                  ncols=83):
+    
+                x, y = test_tuple
+                
+                wl = data.create_coupling_wavelength(y.shape[0]) 
+                # Transform to rescaled: wl - lambda & torch Tensor
+                lam = torch.Tensor(data.wl_to_lambda(wl))
+                # permute (flux and wl together)
+                perm = torch.randperm(y.shape[1])
+                y = torch.hstack( (y[:,perm], lam[:,perm]) )
+                # device
+                x, y = x.to(c.device), y.to(c.device)  
+    
+                features = model.cond_net.features(y)
+                with torch.no_grad():
+                    output, jac = model.model(x, features)
+                        
+                zz = torch.sum(output**2, dim=1)
+                neg_log_likeli = 0.5 * zz - jac
+    
+                tl = torch.mean(neg_log_likeli)
+                # DO NOT BACKWARD FOR TEST!! USE NO_GRAD()
+                # tl.backward(retain_graph=c.do_rev)
+    
+                if c.do_rev:
+                    samples_noisy = sample_z(c.latent_noise) + output.data
+                    with torch.no_grad():
+                        x_rec, _ = model.model(samples_noisy, features, rev=True)
+        
+                        tl_rev = torch.mean( (x-x_rec)**2 )
+                else:
+                    tl_rev = dummy_loss()
+                # tl_rev = dummy_loss()
+    
+                test_loss_history.append([tl.item(), tl_rev.item()])
+    
+                if i_batch+1 >= c.n_its_per_epoch:
+                    # somehow the data loader workers don't shut down automatically
+                    try:
+                        test_iter._shutdown_workers()
+                    except:
+                        pass
+    
+                    break
+                
+            model.weight_scheduler.step()
+            
+            # calculate loss of this epoch
+            epoch_losses_mn = np.mean(np.array(loss_history), axis=0) # 이걸 mean 하는지 median하는지에 따라서. 
+            test_epoch_losses_mn = np.mean(np.array(test_loss_history), axis=0)
+            
+            epoch_losses_mdn = np.median(np.array(loss_history), axis=0)
+            test_epoch_losses_mdn = np.median(np.array(test_loss_history), axis=0)
+            
+            epoch_loss_history['Loss_train_mn'][i_epoch] = epoch_losses_mn[0]
+            epoch_loss_history['Loss_test_mn'][i_epoch] = test_epoch_losses_mn[0]
+            epoch_loss_history['Loss_train_mdn'][i_epoch] = epoch_losses_mdn[0]
+            epoch_loss_history['Loss_test_mdn'][i_epoch] = test_epoch_losses_mdn[0]
+            
+            epoch_loss_history['L_rev_train_mn'][i_epoch] = epoch_losses_mn[1]
+            epoch_loss_history['L_rev_test_mn'][i_epoch] = test_epoch_losses_mn[1]
+            epoch_loss_history['L_rev_train_mdn'][i_epoch] = epoch_losses_mdn[1]
+            epoch_loss_history['L_rev_test_mdn'][i_epoch] = test_epoch_losses_mdn[1]
+                                           
+            
+            if verbose:
+                if i_epoch > 2 - c.pre_low_lr:
+                    viz.show_loss([epoch_loss_history[k_name][i_epoch] for k_name in c.loss_names], 
+                                  logscale=False, its=min(len(test_loader), c.n_its_per_epoch) )
+            
+                    output_orig = output.cpu()
+                    viz.show_hist(output_orig) # pass
+    
+            with torch.no_grad():
+                samples = sample_z(1.)
+                pass
+            
+            if (i_epoch > 10)*((i_epoch % 20)==0):
+                # loss_array = np.array(epoch_loss_history)
+                fig, ax = plot_loss_curve_2types(
+                                        epoch_loss_history['Epoch'][:i_epoch+1],
+                                        epoch_loss_history['Loss_train_mn'][:i_epoch+1],
+                                        epoch_loss_history['Loss_test_mn'][:i_epoch+1],
+                                        epoch_loss_history['Loss_train_mdn'][:i_epoch+1],
+                                        epoch_loss_history['Loss_test_mdn'][:i_epoch+1],
+                                        # loss_array[:,0], loss_array[:,1], loss_array[:,3], 
+                                            c=c, 
+                                          figname=c.filename+'_Loss_plot.pdf', # 이부분 hyperearch에선 바꿔줘야? 아님 나중에 폴더로 이동?
+                                          yrange=c.loss_plot_yrange, xrange=c.loss_plot_xrange, 
+                                          title=os.path.basename(c.config_file).replace('.py','') )
+            
+            model.model.zero_grad()
+    
+            if c.checkpoint_save:
+                if (i_epoch % c.checkpoint_save_interval) == 0:
+                    model.save(c.filename + '_checkpoint_%.4i' % (i_epoch * (1-c.checkpoint_save_overwrite)))
+                    
+            #####
+            # Check convergence and divergence and change training_status
+            #####
+            if i_epoch > N_CONV_CHECK:
+                flag_train_conv = train_tools.check_convergence(epoch_loss_history[name_check_train][:i_epoch+1], 
+                                                   conv_cut=CONV_CUT, n_conv_check=N_CONV_CHECK)
+                flag_test_conv = train_tools.check_convergence(epoch_loss_history[name_check_test][:i_epoch+1],
+                                               conv_cut=CONV_CUT, n_conv_check=N_CONV_CHECK)
+                if flag_train_conv * flag_test_conv:
+                    if verbose:
+                        print("Both train and test curves converged at: %d"%i_epoch)
+                    training_status = 1 # 1=converged
+                    
+            if i_epoch > N_DIVG_CHECK:
+                flag_train_divg = train_tools.check_divergence(epoch_loss_history[name_check_train][:i_epoch+1],
+                                                   chunk_size=DIVG_CHUNK_SIZE, n_divg_check=N_DIVG_CHECK, divg_cri=DIVG_CRI)
+                flag_test_divg = train_tools.check_divergence(epoch_loss_history[name_check_test][:i_epoch+1], 
+                                                  chunk_size=DIVG_CHUNK_SIZE, n_divg_check=N_DIVG_CHECK, divg_cri=DIVG_CRI)
+                if flag_test_divg==True or flag_train_divg==True:
+                    if verbose:
+                        print("Either train or test curve diverged at: %d"%i_epoch)
+                    training_status = -1 # -1 = diverged
+                    
+            
+        
+        
+        ### END LOOP    
+        final_epoch = i_epoch + 1
+        # remove unnecessary data in loss 
+        epoch_loss_history = epoch_loss_history[:final_epoch]
+        # update config with actural n_epochs used
+        c.n_epochs = final_epoch
+        train_tools.rewrite_config_element(c.config_file,  new_config_file=c.config_file, 
+                                           param_to_change='n_epochs', value_to_change=c.n_epochs)
+        
+        if verbose:
+            if c.live_visualization:
+                viz.visualizer.viz.text('<h1 style="color:green">Done</h1>', win=running_box)
+        model.save(c.filename)
+        
+        # loss_array = np.array(epoch_loss_history)
+        fig, ax = plot_loss_curve_2types(
+                                    epoch_loss_history['Epoch'][:i_epoch+1],
+                                    epoch_loss_history['Loss_train_mn'][:i_epoch+1],
+                                    epoch_loss_history['Loss_test_mn'][:i_epoch+1],
+                                    epoch_loss_history['Loss_train_mdn'][:i_epoch+1],
+                                    epoch_loss_history['Loss_test_mdn'][:i_epoch+1],
+                                  c=c, 
+                                  figname=c.filename+'_Loss_plot.pdf', #여기도 주의
+                                  yrange=c.loss_plot_yrange, xrange=c.loss_plot_xrange, 
+                                  title=os.path.basename(c.config_file).replace('.py',''))
+        
+        # header = 'Epoch\tL_train\tlr_train\tL_test\tlr_test'
+        header = '\t'.join(epoch_loss_history.dtype.names)
+        formats = []
+        for name in epoch_loss_history.dtype.names:
+            if epoch_loss_history[name].dtype == np.int32:
+                formats.append('%d')
+            else:
+                formats.append('%.8f')
+         
+        np.savetxt(c.filename+'_loss_history.txt', epoch_loss_history, delimiter='\t', fmt='\t'.join(formats), header=header)
+
+    except:
+        model.save(c.filename + '_ABORT')
+        loss_array = np.array(epoch_loss_history)
         if len(epoch_loss_history) > 10:
             fig, ax = plot_loss_curve_2types(
                                     epoch_loss_history['Epoch'][:i_epoch+1],
