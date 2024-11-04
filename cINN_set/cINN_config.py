@@ -354,7 +354,7 @@ class cINNConfig():
     
     # Rescale parameters
     def load_rescale_params(self):   
-        state_dicts = torch.load(self.filename, map_location=torch.device('cpu'))
+        state_dicts = torch.load(self.filename, map_location=torch.device('cpu'), weights_only=False)
         self.mu_x = state_dicts['rescale_params']['mu_x']#.astype(np.float32)
         self.mu_y = state_dicts['rescale_params']['mu_y']#.astype(np.float32)
         self.w_x = state_dicts['rescale_params']['w_x']#.astype(np.float32)

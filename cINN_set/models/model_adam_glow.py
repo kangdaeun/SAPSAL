@@ -124,7 +124,7 @@ class ModelAdamGLOW(nn.Module):
                     'rescale_params':self.rescale_params}, name)
 
     def load(self, name, device='cpu'):
-        state_dicts = torch.load(name, map_location=torch.device(device))
+        state_dicts = torch.load(name, map_location=torch.device(device), weights_only=False)
         self.model.load_state_dict(state_dicts['net'])
         self.cond_net.load_state_dict(state_dicts['cond_net'])
         try:

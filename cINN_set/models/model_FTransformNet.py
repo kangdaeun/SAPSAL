@@ -66,7 +66,7 @@ class FTransformNet_GLOW(nn.Module):
                     'net':self.model.state_dict(),}, name)
         
     def load(self, name, device='cpu'):
-        state_dicts = torch.load(name, map_location=torch.device(device))
+        state_dicts = torch.load(name, map_location=torch.device(device), weights_only=False)
         self.model.load_state_dict(state_dicts['net'])
         try:
             self.optim.load_state_dict(state_dicts['opt'])
