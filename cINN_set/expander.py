@@ -2,6 +2,13 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import sys
+import os
+from astropy.io import ascii
+if sys.version_info >= (3, 9):
+    import importlib.resources as resources
+else:
+    import pkgutil
 # float_dtype = np.float64
 # int_dtype = np.int64
 # from astopy.table import Table
@@ -182,7 +189,9 @@ def get_dominika_f750_2d(wl, fl): # 1D wavelength value, and 2D flux valu
     id750 = np.abs(wl - 7500.).argmin()
     f750_2d = np.nanmedian(fl[:, id750 - 3:id750 + 3], axis=1) # this is 1D array
     return f750_2d
-    
+ 
+
+# Veiling   
 def add_veil(wl, fl, veil):
    
     # for only one spectrum
@@ -198,6 +207,35 @@ def add_veil(wl, fl, veil):
         
     return fl
 
+# HSlab veiling 
+def add_slab_veil(wl, fl, veil, fslab_750):
+    # for only one spectrum
+    if len(fl.shape)==1:
+        f750 = get_dominika_f750(wl, fl)
+        fl = fl + veil * fslab_750 * f750
+    # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
+    elif len(fl.shape)==2:
+        f750 = get_dominika_f750_2d(wl, fl)
+        # one slab or different slabs
+        if len(fslab_750.shape)==1: # one slab for all spec -> make 2D array
+            fslab_750 = np.repeat(fslab_750.reshape(1,-1), fl.shape[0], axis=0)
+        if len(veil)==fl.shape[0]:
+            fl = fl + ((veil * f750).reshape(-1,1) )*fslab_750
+    return fl
+
+# read already saved one slab
+def read_example_slab():
+    package = "cINN_set"
+    filename = "Slab_T7_N13_t1_n750.txt"
+    if sys.version_info >= (3, 9):  # Python 3.9 
+        with resources.files(package).joinpath(filename).open("r", encoding="utf-8") as f:
+            float_array = np.array(f.read().split(), dtype=float)
+    else: 
+        data = pkgutil.get_data(package, filename)
+        float_array = np.array(data.decode("utf-8").split(), dtype=float)
+    # filepath = "./Slab_T7_N13_t1_n750.txt" # normalized at 7500A
+    # np.loadtxt(filepath)
+    return float_array
 
 
 def get_muse_wl():
@@ -209,9 +247,169 @@ def get_coupling_wavelength(y_names):
     # wl = get_muse_wl()[np.array([int(i[1:]) for i in y_names])]
     # return np.repeat(wl.reshape(1,-1), N_data, axis=0)
     
+# for domain adaptation 
+def read_realdatabase(tablename, y_names): # read and only return usable y bins
+    real_table = pd.read_csv(tablename)
+  
+    if len(y_names) < 3681:
+        spec = real_table.loc[:, y_names].values
+    else:
+        spec = real_table.loc[:, ['l{:d}'.format(i) for i in range(3681)]].values
+    
+    return spec
 
-from cINN_set.execute import get_posterior as get_post
-from cINN_set.execute import get_posterior_group as get_post_group
+
+"""
+ SpT related functions
+"""
+# SpT - SpT index 
+def convert_spt_to_num(spt):
+    if 'M' in spt:
+        return float(spt[1:])+8 # K type: K0 ~ K7
+    elif 'K' in spt:
+        return float(spt[1:])
+    elif 'G' in spt:
+        return float(spt[1:])-10
+    elif 'F' in spt:
+        return float(spt[1:])-20
+    elif 'A' in spt:
+        return float(spt[1:])-30
+    elif 'B' in spt:
+        return float(spt[1:])-40
+    else:
+        print("No matching")
+        return None
+                    
+def convert_sptnum_to_spt(spt):
+    if spt >=8:
+        return 'M'+str(spt-8)
+    elif spt <8 and spt >=0:
+        return 'K'+str(spt)
+    elif spt < 0 and spt >= -10:
+        return 'G'+str(spt+10)
+    elif spt < -10 and spt >= -20:
+        return 'F'+str(spt+20)
+    elif spt < -20 and spt >= -30:
+        return 'A'+str(spt+30)
+    elif spt < -30 and spt >= -40:
+        return 'B'+str(spt+40)
+    else:
+        print("No matching")
+        return None
+        
+
+module_path = os.path.dirname(os.path.abspath(__file__))
+cvt_file = module_path +'/' + 'SpT-Teff_combine.txt'
+
+spt_convert_table = ascii.read(cvt_file , format='commented_header', delimiter='\t')
+def convert_temp_to_sptnum(teff, option=None):
+
+    if option is None:
+        key = 'Teff_grid_tpl'
+    elif option =='Tr14':
+        key = 'Teff_grid_Tr14'
+    elif option =='KH95':
+        key = 'Teff_grid_KH95'
+    elif option =='HH14':
+        key = 'Teff_grid_HH14'
+    else:
+        key = 'Teff_grid_tpl'
+
+    ref_temp = spt_convert_table[key]
+    ref_sptind = spt_convert_table['SpTind']
+    
+    i_tmax = np.argmax(ref_temp)
+    i_tmin = np.argmin(ref_temp)
+    
+    if teff <= np.min(ref_temp):
+        return ref_sptind[i_tmin]
+    if teff >= np.max(ref_temp):
+        return ref_sptind[i_tmax]
+    
+    arg_min = np.argmin(abs(ref_temp-teff))
+    if ref_temp[arg_min] >= teff:
+        ind_right = arg_min # higher temp
+        ind_left = arg_min +1 # sort from High to Low Teff
+    else:
+        ind_left = arg_min # lower temp
+        ind_right = arg_min -1
+    t1, t2 = ref_temp[ind_left], ref_temp[ind_right]
+    n1, n2 = ref_sptind[ind_left], ref_sptind[ind_right]
+    num = (n2-n1)/(t2-t1)*(teff - t1) + n1
+    return num
+
+
+def convert_sptnum_to_temp(sptnum, option=None):
+    if option is None:
+        key = 'Teff_grid_tpl'
+    elif option =='Tr14':
+        key = 'Teff_grid_Tr14'
+    elif option =='KH95':
+        key = 'Teff_grid_KH95'
+    elif option =='HH14':
+        key = 'Teff_grid_HH14'
+    else:
+        key = 'Teff_grid_tpl'
+
+    ref_temp = spt_convert_table[key]
+    ref_sptind = spt_convert_table['SpTind']
+    
+    i_tmax = np.argmax(ref_temp)
+    i_tmin = np.argmin(ref_temp)
+    
+    if sptnum <= np.min(ref_sptind):
+        return ref_temp[i_tmax]
+    if sptnum >= np.max(ref_sptind):
+        return ref_temp[i_tmin]
+    
+    arg_min = np.argmin(abs(ref_sptind-sptnum))
+    if ref_sptind[arg_min] >= sptnum:
+        ind_right = arg_min # larger index 
+        ind_left = arg_min -1 # sort from small to large index
+    else:
+        ind_left = arg_min # smaller index
+        ind_right = arg_min +1
+    t1, t2 = ref_temp[ind_left], ref_temp[ind_right]
+    n1, n2 = ref_sptind[ind_left], ref_sptind[ind_right]
+    temp = (t2-t1)/(n2-n1)*(sptnum - n1) + t1
+    return temp
+
+def convert_spt_to_temp(spt, option=None):
+    return convert_sptnum_to_temp( convert_spt_to_num(spt), option=option )
+def convert_temp_to_spt(temp, option=None):
+    return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option))
+
+# upgraded version
+def make_spt(only_int=False, option='Tr14'):
+    
+    if option is None:
+        key = 'Teff_grid_tpl'
+    elif option =='Tr14':
+        key = 'Teff_grid_Tr14'
+    elif option =='KH95':
+        key = 'Teff_grid_KH95'
+    elif option =='HH14':
+        key = 'Teff_grid_HH14'
+    else:
+        key = 'Teff_grid_Tr14'
+
+
+    if only_int:
+        spt_array = np.array( [k for k in np.unique(spt_convert_table['SpT'].data) if float(k[1:])==np.around(float(k[1:])) ] )
+    else:
+        spt_array = np.unique(spt_convert_table['SpT'].data)
+
+    spt_t_array = np.array([spt_convert_table[key][np.where(spt_convert_table['SpT']==k)[-1][0]] for k in spt_array])
+    arg = np.argsort(spt_t_array)
+    spt_t_array = spt_t_array[arg]
+    spt_array = spt_array[arg]
+    return spt_array, spt_t_array
+    
+
+# -----------------------------------------------------------------------------------
+
+from .execute import get_posterior as get_post
+from .execute import get_posterior_group as get_post_group
 
 def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, quiet=True, use_group=False, group=None):
     
@@ -328,14 +526,14 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
         size = (int(size[0]*expand), size[1] )
         
         
-    if correlation == 'Ind_Unif':
+    if correlation == 'Ind_Unif': # all y components have the same p(sigma)
         if sampling_method == 'gaussian': # N(mean, std)  
             rn = np.random.randn(*size)*lsig_std + lsig_mean
         elif sampling_method == 'uniform': # [min, max)
             rn = np.random.rand(*size)*(lsig_max - lsig_min) + lsig_min
         lsig = rn
         
-    elif correlation == 'Ind_Man':
+    elif correlation == 'Ind_Man': # every y component have different p(sigma) 
         lsig = np.zeros(size)
         if sampling_method == 'gaussian': # N(mean, std)  
             for i in range(lsig.shape[1]):
@@ -344,7 +542,7 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
             for i in range(lsig.shape[1]):
                 lsig[:,i] = np.random.rand(lsig.shape[0])*(lsig_max[i] - lsig_min[i]) + lsig_min[i]
     
-    elif correlation == 'Single':
+    elif correlation == 'Single': # all y components have the same sigma value
         lsig = np.zeros(size)
         if sampling_method == 'gaussian': # N(mean, std)  
             rn = np.random.randn(lsig.shape[0])*lsig_std + lsig_mean
@@ -359,38 +557,77 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
         lsig = lsig.reshape(size[-1])
     
     return lsig
+
+
+def divide_wl_segment(wl, start=1000, end=12000, seg_size=500):
+    """
+    make wavelength segment for uncertainty sampling
+
+    Parameters
+    ----------
+    wl : TYPE
+        wavelength of spectrum used as input to the network
+    start : treated minimum wavelength. for optical it is 1000A
+        DESCRIPTION. The default is 1000.
+    end : TYPE, optional
+        DESCRIPTION. The default is 12000.
+    seg_size : segment size. 200A, 500A , 1000A, ,
+        DESCRIPTION. The default is 500.
+
+    Returns
+    -------
+    iseg_list : TYPE
+        DESCRIPTION.
+
+    """
+    wl_min = np.min(wl); wl_max = np.max(wl)
+    if wl_min < start: 
+        sys.exit("min(wl) <  %f"%start)
+    else:
+        start = np.floor(wl_min/seg_size)*seg_size
+    if wl_max > end: 
+        sys.exit("max(wl) > %f"%end)
+    else:
+        end = np.ceil(wl_max/seg_size)*seg_size
+    
+    n_seg = (end-start)/seg_size
+    iseg_list = []
+    for i_seg in range(n_seg):
+        iseg_list.append( np.where( (wl >= start+seg_size*i_seg)*(wl < start+seg_size*(i_seg+1)) )[0] )
+    return iseg_list
+  
      
 
         
 ############################################################################
 title_unit_dic = {
-    'logTeff': "log T$_{\mathrm{eff}}$ (K)",
-    'Teff': 'T$_{\mathrm{eff}}$ (K)',
-    'logG': 'log g (cm s$^{-2}$)',
-    'A_V': 'A$_{\mathrm{V}}$ (mag)',
-    'veil_r': 'r$_{\mathrm{veil}}$',
+    'logTeff': r"log T$_{\mathrm{eff}}$ (K)",
+    'Teff': r'T$_{\mathrm{eff}}$ (K)',
+    'logG': r'log g (cm s$^{-2}$)',
+    'A_V': r'A$_{\mathrm{V}}$ (mag)',
+    'veil_r': r'r$_{\mathrm{veil}}$',
     'library': 'Library',
-    "R_V": 'R$_{\mathrm{V}}$',
+    "R_V": r'R$_{\mathrm{V}}$',
 }
 
 title_dic = {
-    'logTeff': "log T$_{\mathrm{eff}}$",
-    'Teff': 'T$_{\mathrm{eff}}$',
+    'logTeff': r"log T$_{\mathrm{eff}}$",
+    'Teff': r'T$_{\mathrm{eff}}$',
     'logG': 'log g',
-    'A_V': 'A$_{\mathrm{V}}$',
+    'A_V': r'A$_{\mathrm{V}}$',
     'library': 'Library',
-    'veil_r': 'r$_{\mathrm{veil}}$',
-    "R_V": 'R$_{\mathrm{V}}$',
+    'veil_r': r'r$_{\mathrm{veil}}$',
+    "R_V": r'R$_{\mathrm{V}}$',
     
-    'tT': 'T$_{\mathrm{eff}}^{\mathrm{True}}$',
-    'mT': 'T$_{\mathrm{eff}}^{\mathrm{MAP}}$',
-    'dT': '$\Delta$ T$_{\mathrm{eff}}$',
-    'tG': 'log g$^{\mathrm{True}}$',
-    'mG': 'log g$^{\mathrm{MAP}}$',
-    'dG': '$\Delta$ log g',
-    'tA': 'A$_{\mathrm{V}}^{\mathrm{True}}$',
-    'mA': 'A$_{\mathrm{V}}^{\mathrm{MAP}}$',
-    'dA': '$\Delta$ A$_{\mathrm{V}}$',
+    'tT': r'T$_{\mathrm{eff}}^{\mathrm{True}}$',
+    'mT': r'T$_{\mathrm{eff}}^{\mathrm{MAP}}$',
+    'dT': r'$\Delta$ T$_{\mathrm{eff}}$',
+    'tG': r'log g$^{\mathrm{True}}$',
+    'mG': r'log g$^{\mathrm{MAP}}$',
+    'dG': r'$\Delta$ log g',
+    'tA': r'A$_{\mathrm{V}}^{\mathrm{True}}$',
+    'mA': r'A$_{\mathrm{V}}^{\mathrm{MAP}}$',
+    'dA': r'$\Delta$ A$_{\mathrm{V}}$',
 } 
 
 
@@ -466,7 +703,7 @@ def calculate_map(parameter_distr, astro,
                   nrow = None, ncol=None, figsize=[10,7],
                   xranges_dic=None, nbin=100,  model_distr=None, bar_plot = True,
                   color_post='gray', alpha=0.4, color_kde=None,color_model='red',color_map = 'orange',
-                  legend=True,legend_post='posterior', legend_model='X$^{\mathrm{True}}$', legend_map='X$^{\mathrm{MAP}}$',
+                  legend=True,legend_post='posterior', legend_model=r'X$^{\mathrm{True}}$', legend_map=r'X$^{\mathrm{MAP}}$',
                   ind_legend=0,
                   ylabelsize='medium',xlabelsize='large',legendsize='small',ticklabelsize='medium', **kwarg):
 
@@ -736,7 +973,7 @@ def plot_posterior(posterior, axis, c,
                 
             if plot_true:
                 if np.isfinite(true_val):
-                    ax.axvline(x=true_val, color='r', ls='-', label='$X^{\mathrm{True}}$=%#.4g'%(true_val))
+                    ax.axvline(x=true_val, color='r', ls='-', label=r'$X^{\mathrm{True}}$=%#.4g'%(true_val))
             if plot_map:
                 ax.axvline(x=x_map, color=color_map, ls='--',)
             
@@ -746,11 +983,11 @@ def plot_posterior(posterior, axis, c,
             txt = []
             if text_true:
                 if np.isfinite(true_val):
-                    txt.append('$X^{\mathrm{True}}$=%#.4g'%(true_val))
+                    txt.append(r'$X^{\mathrm{True}}$=%#.4g'%(true_val))
                     if param=='logTeff':
                         txt.append('(%.5g [K])'%10**x_true[i_param])
             if text_map:
-                txt.append( '$X^{\mathrm{MAP}}$=%#.4g'%(x_map)     )
+                txt.append( r'$X^{\mathrm{MAP}}$=%#.4g'%(x_map)     )
                 if param=='logTeff':
                     txt.append('(%.5g [K])'%10**x_map)
               
