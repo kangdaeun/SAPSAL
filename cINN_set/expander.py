@@ -300,31 +300,39 @@ def convert_sptnum_to_spt(spt):
 
 module_path = os.path.dirname(os.path.abspath(__file__))
 cvt_file = module_path +'/' + 'SpT-Teff_combine.txt'
-
 spt_convert_table = ascii.read(cvt_file , format='commented_header', delimiter='\t')
-def convert_temp_to_sptnum(teff, option=None):
+spt_option_dic = {'KH95': 'Teff_KH95', 'L03': 'Teff_L03', 'HH14': 'Teff_HH14', 
+              'Tr14_ori': 'Teff_Tr14_It24', 'Tpl_ori': 'Teff_Templates', 
+              'Tr14': 'Tr14_ext', 'Tpl': 'Tpl_ext'}
+spt_desc_dic = {}
+for key, name in option_dic.items():
+    teff = table[name]
+    tab = table[np.isfinite(teff)]
+    late = tab['SpT'][np.argmin(tab[name])]
+    early = tab['SpT'][np.argmax(tab[name])]
+    spt_desc_dic[key] = "%s (%s - %s)"%(key, early, late)
 
-    if option is None:
-        key = 'Teff_grid_tpl'
-    elif option =='Tr14':
-        key = 'Teff_grid_Tr14'
-    elif option =='KH95':
-        key = 'Teff_grid_KH95'
-    elif option =='HH14':
-        key = 'Teff_grid_HH14'
-    else:
-        key = 'Teff_grid_tpl'
+def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
 
+    key = option_dic[option]
+      
     ref_temp = spt_convert_table[key]
     ref_sptind = spt_convert_table['SpTind']
+    roi_valid = np.isfinite(ref_temp)
+    ref_temp = ref_temp[roi_valid]
+    ref_sptind = ref_sptind[roi_valid]
     
     i_tmax = np.argmax(ref_temp)
     i_tmin = np.argmin(ref_temp)
     
     if teff <= np.min(ref_temp):
-        return ref_sptind[i_tmin]
+        if out_nan: return np.nan
+        else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
+        # return ref_sptind[i_tmin]
     if teff >= np.max(ref_temp):
-        return ref_sptind[i_tmax]
+        if out_nan: return np.nan
+        else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
+        # return ref_sptind[i_tmax]
     
     arg_min = np.argmin(abs(ref_temp-teff))
     if ref_temp[arg_min] >= teff:
@@ -339,28 +347,26 @@ def convert_temp_to_sptnum(teff, option=None):
     return num
 
 
-def convert_sptnum_to_temp(sptnum, option=None):
-    if option is None:
-        key = 'Teff_grid_tpl'
-    elif option =='Tr14':
-        key = 'Teff_grid_Tr14'
-    elif option =='KH95':
-        key = 'Teff_grid_KH95'
-    elif option =='HH14':
-        key = 'Teff_grid_HH14'
-    else:
-        key = 'Teff_grid_tpl'
+def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
+    key = option_dic[option]
 
     ref_temp = spt_convert_table[key]
     ref_sptind = spt_convert_table['SpTind']
+    roi_valid = np.isfinite(ref_temp)
+    ref_temp = ref_temp[roi_valid]
+    ref_sptind = ref_sptind[roi_valid]
     
     i_tmax = np.argmax(ref_temp)
     i_tmin = np.argmin(ref_temp)
     
     if sptnum <= np.min(ref_sptind):
-        return ref_temp[i_tmax]
+        if out_nan: return np.nan
+        else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
+        # return ref_temp[i_tmax]
     if sptnum >= np.max(ref_sptind):
-        return ref_temp[i_tmin]
+        if out_nan: return np.nan
+        else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
+        # return ref_temp[i_tmin]
     
     arg_min = np.argmin(abs(ref_sptind-sptnum))
     if ref_sptind[arg_min] >= sptnum:
@@ -374,30 +380,19 @@ def convert_sptnum_to_temp(sptnum, option=None):
     temp = (t2-t1)/(n2-n1)*(sptnum - n1) + t1
     return temp
 
-def convert_spt_to_temp(spt, option=None):
-    return convert_sptnum_to_temp( convert_spt_to_num(spt), option=option )
-def convert_temp_to_spt(temp, option=None):
-    return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option))
+def convert_spt_to_temp(spt, option=None, out_nan=True):
+    return convert_sptnum_to_temp( convert_spt_to_num(spt), option=option, out_nan=out_nan )
+def convert_temp_to_spt(temp, option=None, out_nan=True):
+    return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan))
 
 # upgraded version
 def make_spt(only_int=False, option='Tr14'):
-    
-    if option is None:
-        key = 'Teff_grid_tpl'
-    elif option =='Tr14':
-        key = 'Teff_grid_Tr14'
-    elif option =='KH95':
-        key = 'Teff_grid_KH95'
-    elif option =='HH14':
-        key = 'Teff_grid_HH14'
-    else:
-        key = 'Teff_grid_Tr14'
-
-
+    key = spt_option_dic[option]
+    spt_avail = spt_convert_table['SpT'].data[np.isfinite(spt_convert_table[key])]
     if only_int:
-        spt_array = np.array( [k for k in np.unique(spt_convert_table['SpT'].data) if float(k[1:])==np.around(float(k[1:])) ] )
+        spt_array = np.array( [k for k in np.unique(spt_avail) if float(k[1:])==np.around(float(k[1:])) ] )
     else:
-        spt_array = np.unique(spt_convert_table['SpT'].data)
+        spt_array = np.unique(spt_avail)
 
     spt_t_array = np.array([spt_convert_table[key][np.where(spt_convert_table['SpT']==k)[-1][0]] for k in spt_array])
     arg = np.argsort(spt_t_array)
