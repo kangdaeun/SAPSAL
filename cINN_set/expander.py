@@ -305,16 +305,16 @@ spt_option_dic = {'KH95': 'Teff_KH95', 'L03': 'Teff_L03', 'HH14': 'Teff_HH14',
               'Tr14_ori': 'Teff_Tr14_It24', 'Tpl_ori': 'Teff_Templates', 
               'Tr14': 'Tr14_ext', 'Tpl': 'Tpl_ext'}
 spt_desc_dic = {}
-for key, name in option_dic.items():
-    teff = table[name]
-    tab = table[np.isfinite(teff)]
+for key, name in spt_option_dic.items():
+    teff = spt_convert_table[name]
+    tab = spt_convert_table[np.isfinite(teff)]
     late = tab['SpT'][np.argmin(tab[name])]
     early = tab['SpT'][np.argmax(tab[name])]
     spt_desc_dic[key] = "%s (%s - %s)"%(key, early, late)
 
 def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
 
-    key = option_dic[option]
+    key = spt_option_dic[option]
       
     ref_temp = spt_convert_table[key]
     ref_sptind = spt_convert_table['SpTind']
@@ -348,7 +348,7 @@ def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
 
 
 def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
-    key = option_dic[option]
+    key = spt_option_dic[option]
 
     ref_temp = spt_convert_table[key]
     ref_sptind = spt_convert_table['SpTind']
