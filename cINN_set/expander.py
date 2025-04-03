@@ -276,6 +276,8 @@ def convert_spt_to_num(spt):
         return float(spt[1:])-30
     elif 'B' in spt:
         return float(spt[1:])-40
+    elif 'O' in spt:
+        return float(spt[1:])-50
     else:
         print("No matching")
         return None
@@ -293,6 +295,8 @@ def convert_sptnum_to_spt(spt):
         return 'A'+str(spt+30)
     elif spt < -30 and spt >= -40:
         return 'B'+str(spt+40)
+    elif spt < -40 and spt >= -50:
+        return 'O'+str(spt+50)
     else:
         print("No matching")
         return None
@@ -312,7 +316,7 @@ for key, name in spt_option_dic.items():
     early = tab['SpT'][np.argmax(tab[name])]
     spt_desc_dic[key] = "%s (%s - %s)"%(key, early, late)
 
-def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
+def convert_temp_to_sptnum(teff, option='Tpl', out_nan=False):
 
     key = spt_option_dic[option]
       
@@ -325,11 +329,11 @@ def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
     i_tmax = np.argmax(ref_temp)
     i_tmin = np.argmin(ref_temp)
     
-    if teff <= np.min(ref_temp):
+    if teff < np.min(ref_temp):
         if out_nan: return np.nan
         else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
         # return ref_sptind[i_tmin]
-    if teff >= np.max(ref_temp):
+    if teff > np.max(ref_temp):
         if out_nan: return np.nan
         else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
         # return ref_sptind[i_tmax]
@@ -347,7 +351,7 @@ def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
     return num
 
 
-def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
+def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=False):
     key = spt_option_dic[option]
 
     ref_temp = spt_convert_table[key]
@@ -359,11 +363,11 @@ def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
     i_tmax = np.argmax(ref_temp)
     i_tmin = np.argmin(ref_temp)
     
-    if sptnum <= np.min(ref_sptind):
+    if sptnum < np.min(ref_sptind):
         if out_nan: return np.nan
         else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
         # return ref_temp[i_tmax]
-    if sptnum >= np.max(ref_sptind):
+    if sptnum > np.max(ref_sptind):
         if out_nan: return np.nan
         else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
         # return ref_temp[i_tmin]
@@ -380,9 +384,9 @@ def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
     temp = (t2-t1)/(n2-n1)*(sptnum - n1) + t1
     return temp
 
-def convert_spt_to_temp(spt, option=None, out_nan=True):
+def convert_spt_to_temp(spt, option=None, out_nan=False):
     return convert_sptnum_to_temp( convert_spt_to_num(spt), option=option, out_nan=out_nan )
-def convert_temp_to_spt(temp, option=None, out_nan=True):
+def convert_temp_to_spt(temp, option=None, out_nan=False):
     return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan))
 
 # upgraded version
@@ -448,8 +452,8 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
     else:
         return astro.x_to_params(output)
     
-GPU_MAX_LOAD = 0.1          # Maximum compute load of GPU allowed in automated selection
-GPU_MAX_MEMORY = 0.1         # Maximum memory load of GPU allowed in automated selection
+GPU_MAX_LOAD = 0.5         # Maximum compute load of GPU allowed in automated selection
+GPU_MAX_MEMORY = 0.5         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
@@ -603,6 +607,7 @@ title_unit_dic = {
     'veil_r': r'r$_{\mathrm{veil}}$',
     'library': 'Library',
     "R_V": r'R$_{\mathrm{V}}$',
+
 }
 
 title_dic = {
