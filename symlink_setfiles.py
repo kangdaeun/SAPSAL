@@ -22,9 +22,9 @@ import os, sys, glob
 # ess_dir = '../Networks/ess_files/' # real files
 # db_dir = '../Database/' # real files
 
-ess_dir = '/export/scratch/dekang/ECOGAL/cinn_ssp/Networks/ess_files' # abspath to real files (not symbolic link)
-db_dir = '/export/scratch/dekang/ECOGAL/cinn_ssp/Database' # abspath
-cINN_set_dir = '/export/scratch/dekang/ECOGAL/cinn_ssp/Networks/cINN_set'
+ess_dir = '/Users/daeun/Astronomy/Pj_cinn_ssp/cINN_SSP/ess_files' # abspath to real files (not symbolic link)
+db_dir = '/Users/daeun/Astronomy/Pj_cinn_ssp/Database' # abspath
+cINN_set_dir = '/Users/daeun/Astronomy/Pj_cinn_ssp/cINN_SSP/cINN_set'
 
 
 proj_dir = sys.argv[1]

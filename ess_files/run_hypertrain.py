@@ -42,12 +42,12 @@ parser.add_argument('-r','--resume', required=False, default=None, help="Resume 
 """
 
 import numpy as np
-import os, glob
+import os, glob, sys
 import pandas as pd
 import subprocess
 import multiprocessing
 from argparse import ArgumentParser
-import random
+# import random
 # from itertools import repeat
 from time import time
 from time import sleep
@@ -64,23 +64,36 @@ import cINN_set.tools.test_tools as test_tools #combine_multiple_evaluations
 ## Setup ##
 ###########
 
-N_RAND = 100                         # Number of random configs to generate
+N_RAND = 40                         # Number of random configs to generate
 SEED = 25081136                       # Random seed for config randomisation # 25011132               
 
-N_PROCESSES = 1             # Number of multiple processes
+N_PROCESSES = 1           # Number of multiple processes
+
 
 OUTPUT_DIR = "HP_search_random/"    # Path to output directory
 OUTPUT_SUFFIX = "HP_NET"           # Optional suffix for all output files (can change by option argument)
 
+# for Slurm jobs
+NUM_CPUS = None
+if "SLURM_CPUS_PER_TASK" in os.environ:
+    NUM_CPUS = int(os.environ["SLURM_CPUS_PER_TASK"])
+elif "SLURM_JOB_CPUS_PER_NODE" in os.environ:
+    NUM_CPUS = int(os.environ["SLURM_JOB_CPUS_PER_NODE"])
 
-DEVICE = 'mps'              # Device to run search on, either 'cuda' or 'cpu'
+if NUM_CPUS:
+    print("NUM_CPUS:",NUM_CPUS)
+    os.environ["OMP_NUM_THREADS"] = str(NUM_CPUS)
+    os.environ["NUMEXPR_MAX_THREADS"] = str(NUM_CPUS)
+
+DEVICE = 'cuda'              # Device to run search on, either 'cuda' or 'cpu'
+# These GPU setup is not used in this code.
 GPU_MAX_LOAD = 0.1          # Maximum compute load of GPU allowed in automated selection
 GPU_MAX_MEMORY = 0.1         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
 
-N_EPOCHS_MAX  = 1000        # Maximum n_epochs for training
+# N_EPOCHS_MAX  = 500        # Maximum n_epochs for training: this is set in run_train.py
 
 # AUTO_N_EPOCHS = False    # Switch to automatically set n_epoch if batch_size and n_its_per_epoch are randomised
 VERBOSE = True           # Switch for progress messages
@@ -93,23 +106,34 @@ SAVE_PLOT_COPY = True  # copy plots
 # Dictionary with the config parameters to randomize, the way to randomize them
 # and parameters to the randomisation function
 SEARCH_PARAMETERS = {
-    "gamma" : (tools.rand_in, {"a":0.1, "b":0.8}),
-    "adam_betas" : (tools.rand_in_discrete, {"options":[(0.8, 0.8), (0.9, 0.9)]}),
-    "lr_init" : (tools.rand_in_log10, {"a":-4, "b":-2}),
+    "gamma" : (tools.rand_in, {"a":0.1, "b":0.7}), # usually 0.1~0.8
+    "adam_betas" : (tools.rand_in_discrete, {"options":[(0.8, 0.8), (0.9, 0.9), (0.5, 0.8), (0.5, 0.9)]}),
+    "lr_init" : (tools.rand_in_log10, {"a":-4, "b":-2}), # -4 ~-2
     "l2_weight_reg" : (tools.rand_in_log10, {"a":-4.3, "b":-2.0}), # (-4.3, -2.5)
-    "meta_epoch" : (np.random.randint, {"low":5, "high":16}),
-    "n_blocks" : (np.random.randint, {"low":8, "high":24+1}),
-    "internal_layer": (np.random.randint, {"low":3, "high":9+1}),
-    # "batch_size" : (tools.rand_in_log2, {"a":8 ,"b":9}),
+    "meta_epoch" : (np.random.randint, {"low":5, "high":15+1}), # 5~15
+    "n_blocks" : (np.random.randint, {"low":8, "high":16+1}), # noise-net: 24+1, normal-net:16+1
+    "internal_layer": (np.random.randint, {"low":3, "high":6+1}),
+    # # "batch_size" : (tools.rand_in_log2, {"a":8 ,"b":9}),
     "internal_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 256
-    "feature_layer": (np.random.randint, {"low":3, "high":9+1}), # usually fixed to 3 (for Noise 3~9+1) (for Normal 3~5+1)
+    "feature_layer": (np.random.randint, {"low":3, "high":6+1}), # usually fixed to 3 (for Noise 3~9+1) (for Normal 3~5+1)
     "feature_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 512
+    "y_dim_features" : (tools.rand_in_log2, {"a":7, "b":9}),
     # "n_its_per_epoch" : (tools.rand_in_log2, {"a":8, "b":10}),
-    # "fcl_internal_size" : (tools.rand_in_log2, {"a":7, "b":11}), 
+#    # "fcl_internal_size" : (tools.rand_in_log2, {"a":7, "b":11}), 
 #    "scale_data" : (tools.rand_bool, {}),
-    # "do_rev" : (tools.rand_bool, {}),
+#    # "do_rev" : (tools.rand_bool, {}),
 #    "use_feature_net" : (tools.rand_bool, {}),
-    "y_dim_features" : (tools.rand_in_log2, {"a":6, "b":11}),
+     # "da_disc_train_step":(np.random.randint, {"low":1, "high":2+1}), 
+     # "da_disc_train_step":(tools.rand_in_discrete, {"options":[1, None]}),
+     # "lambda_adv": (tools.rand_in_discrete, {"options":[1, 1.5, 2]}),
+     # "da_disc_gamma" : (tools.rand_in, {"a":0.1, "b":0.6}),
+     # "da_disc_lr_init" : (tools.rand_in_log10, {"a":-6, "b":-4}),
+     # "da_disc_l2_weight_reg" : (tools.rand_in_log10, {"a":-4, "b":-2.0}), # (-4.3, -2.5)
+     # # "da_disc_adam_betas" : (tools.rand_in_discrete, {"options":[(0.8, 0.8), (0.9, 0.9), (0.5, 0.8), (0.5, 0.9)]}),
+     #  "da_disc_layer": (np.random.randint, {"low":3, "high":6+1}),
+     # # "da_disc_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # 
+     
+
     "seed_weight_init" : (np.random.randint, {"low":1, "high":241542})
     }
 
@@ -181,7 +205,7 @@ def make_random_config(c_ref, n):
         
     # Randomly make one config (class)
     config = tools.randomize_config(c_ref, SEARCH_PARAMETERS,
-                                output_filename_n, DEVICE, N_EPOCHS_MAX,
+                                output_filename_n, DEVICE, #N_EPOCHS_MAX,
                                 adjust_gamma_n_epoch=True)                         
     
     # write and save config
@@ -258,7 +282,7 @@ def train_network(config, logfile=None):
         # args = ['python','ess_files/run_train.py', config.config_file, config.device]
         # if 'cuda' in config.device:
         #     if not check_device(int(config.device.replace('cuda:',''))):
-    args = ['python','ess_files/run_train.py', config.config_file]
+    args = ['python','-u','ess_files/run_train.py', config.config_file, '--log', 'False']
     proc = subprocess.Popen(args,
                             stdout=f_train_log, stderr=f_train_log, start_new_session=True).wait()
     
@@ -287,7 +311,7 @@ def evaluate_network(config, logfile=None):
     if logfile is None:
         f_eval_log = make_log( os.path.dirname(config.filename)+'/',
                                 os.path.basename(config.filename),
-                                'evaluation' )
+                                'eval' )
         close_log = True
     else: 
         close_log = False
@@ -299,7 +323,7 @@ def evaluate_network(config, logfile=None):
         # args = ['python','ess_files/eval_network.py', config.config_file, config.device]
         # if 'cuda' in config.device:
         #     if not check_device(int(config.device.replace('cuda:',''))):
-    args = ['python','ess_files/eval_network.py', config.config_file]
+    args = ['python','-u','ess_files/eval_network.py', config.config_file, '--log', 'False']
 
     # proc1 = subprocess.Popen(['python','ess_files/plot_z_pdf.py', config.config_file, config.device], 
     #                         stdout=f_eval_log, stderr=f_eval_log, start_new_session=True).wait()
@@ -407,7 +431,7 @@ def train_and_eval(config):
         change_gpu_exclude_ids(int(config.device.replace('cuda:','')), remove=True)
     print("\t Finished %s\n"%os.path.basename(config.config_file) )
     
-#%%
+#%% Main
 ##########
 ## MAIN ##
 ##########
@@ -514,7 +538,7 @@ if __name__=='__main__':
         
                 
     # 2. Execute Loop : Train + Evaluation
-    
+    sys.exit()
     t_start = time()
     t_mid = t_start
         

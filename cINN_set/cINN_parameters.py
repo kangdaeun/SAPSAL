@@ -53,6 +53,8 @@ checkpoint_save = True # True/False 이거 관련 train 업데이트
 checkpoint_save_interval = 120 * 2 
 # this will overwrite checkpoint (making the same name)
 checkpoint_save_overwrite = True 
+# this will remove checkpoint files when finish training
+checkpoint_remove_after_training = False
 
 
 ####################### Learning optimization ####################

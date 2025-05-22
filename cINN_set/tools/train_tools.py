@@ -15,8 +15,8 @@ CONV_CUT = 1e-5
 N_CONV_CHECK = 20
 
 CONV_CUT_ROUGH = 2e-3
-N_CONV_CHECK_ROUGH = 100
-N_CONV_CHECK_ROUGH_START = 200
+N_CONV_CHECK_ROUGH = 50
+N_CONV_CHECK_ROUGH_START = 150
 
 # Divergence
 DIVG_CHUNK_SIZE = 7
@@ -24,12 +24,12 @@ N_DIVG_CHECK = 30
 DIVG_CRI = 0
 
 
-def check_divergence(loss_array, chunk_size=DIVG_CHUNK_SIZE, n_divg_check=N_DIVG_CHECK, divg_cri=DIVG_CRI):
+def check_divergence(loss_array, chunk_size=DIVG_CHUNK_SIZE, n_divg_check=N_DIVG_CHECK, divg_cri=DIVG_CRI, negloglike=True):
     """
     Divergence condition:
         1) loss gradually increases
-        2) converged but negative log likelihood is positive
-        3) keep negative log likelihood positive values
+        2) converged but negative log likelihood is positive -> if using negative log likelihodd as loss
+        3) keep negative log likelihood positive values -> if using negative log likelihodd as loss
 
     Parameters
     ----------
@@ -62,12 +62,12 @@ def check_divergence(loss_array, chunk_size=DIVG_CHUNK_SIZE, n_divg_check=N_DIVG
     if np.isfinite(loss_array[-1])==False:
         return True
     # positivie value for neg_loglikelihood -> divergence
-    if np.median(loss_array[-5:])>0:
+    if negloglike==True and np.median(loss_array[-5:])>0:
         return True
     
     if np.sum(roi_divg[-n_check:]) == n_check:
         divergence = True
-    elif np.sum(loss_array[-n_divg_check:] >= 0)==n_divg_check:  # 2) , 3)
+    elif negloglike==True and np.sum(loss_array[-n_divg_check:] >= 0)==n_divg_check:  # 2) , 3)
         divergence = True
     else:
         divergence = False
@@ -112,3 +112,7 @@ def rewrite_config_element(config_file,  new_config_file, param_to_change, value
 
     with open(new_config_file, 'w') as f1:
         f1.write('\n'.join(config_components))
+        
+    
+
+        

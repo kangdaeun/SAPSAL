@@ -25,13 +25,13 @@ DataLoader 에서 추가된 속성
 - database (whole db table)
 
 """
-from astropy.io import ascii
-import pandas as pd
+# from astropy.io import ascii
+# import pandas as pd
 import numpy as np
 import torch # get loader
 import torch.utils.data
-import sys, os
-import importlib.util
+import sys #, os
+# import importlib.util
 
 from .cINN_config import cINNConfig
 
@@ -135,25 +135,7 @@ class DataLoader(cINNConfig):
         
     def include_expander(self):
         self.exp = self.import_expander()
-        
-  
-
-# Do not use this part: functions are in cINNConfig  
-#     def obs_to_y(self, observations):
-#         # y = np.log(observations)
-#         y = np.dot(observations - self.mu_y, self.w_y)
-#         return y #np.clip(y, -5, 5)
-    
-#     def y_to_obs(self, y):
-#         obs = np.dot(y, np.linalg.inv(self.w_y)) + self.mu_y
-#         return obs #np.exp(obs)
- 
-#     def params_to_x(self, parameters):
-#         return np.dot(parameters - self.mu_x, self.w_x)
-    
-#     def x_to_params(self, x):
-#         return np.dot(x, np.linalg.inv(self.w_x)) + self.mu_x
-    
+           
     
     # differce to extract_ is this can preprocess , rescale the data if you want
     def load_data(self, smoothing=False, smoothing_sigma=False, obs_clipping=False,   
@@ -203,31 +185,42 @@ class DataLoader(cINNConfig):
 
         
         # 1) Add veiling 
+        spec_indices = self.exp.get_spec_index(self.y_names)
         if veil_flux:
-            wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in y_names])]
-            all_obs = self.exp.add_veil(wl, all_obs, veil=all_param[:, x_names.index("veil_r")] )
+            wl = self.exp.get_muse_wl()[spec_indices]
+            # ordinary constant veilnig if use_Hslab_veiling is not True
+            if self.use_Hslab_veiling:
+                # not a grid of model but just one
+                if self.use_one_Hslab_model: 
+                    fslab_norm = self.exp.read_example_slab()[spec_indices]
+                    all_obs = self.exp.add_slab_veil(wl, all_obs[:, spec_indices], veil=all_param[:, x_names.index("veil_r")], fslab_750=fslab_norm)
+                # using Hslab grid is not ready yet
+            else:
+                all_obs[:, spec_indices] = self.exp.add_veil(wl, all_obs[:, spec_indices], veil=all_param[:, x_names.index("veil_r")] )
         
         # 2) Add extinction
         if extinct_flux:
-            wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in y_names])]
+            wl = self.exp.get_muse_wl()[spec_indices]
             if "R_V" in x_names:
                 Rv_array = all_param[:, x_names.index("R_V")]
+            elif "R_V" in y_names:
+                Rv_array = all_obs[:, y_names.index("R_V")]
             else:
                 Rv_array = np.array(self.additional_kwarg["R_V"])
-            all_obs = self.exp.extinct_spectrum(wl, all_obs, Av_array=all_param[:, x_names.index("A_V")], Rv_array = Rv_array )
+            all_obs[:, spec_indices] = self.exp.extinct_spectrum(wl, all_obs[:, spec_indices], Av_array=all_param[:, x_names.index("A_V")], Rv_array = Rv_array )
             
         
         
         # 3) Normalize flux: using total flux (small values), using mean flux (factor of len(y_names))
         if normalize_flux:
             if normalize_total_flux:
-                all_obs = all_obs/np.sum(all_obs, axis=1).reshape(-1,1)
+                all_obs[:, spec_indices] = all_obs[:, spec_indices]/np.sum(all_obs[:, spec_indices], axis=1).reshape(-1,1)
             elif normalize_mean_flux:
-                all_obs = all_obs/np.mean(all_obs, axis=1).reshape(-1,1)
+                all_obs[:, spec_indices] = all_obs[:, spec_indices]/np.mean(all_obs[:, spec_indices], axis=1).reshape(-1,1)
             elif normalize_f750:
-                wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in y_names])]
-                f750_array = self.exp.get_dominika_f750_2d(wl, all_obs)
-                all_obs = all_obs / f750_array.reshape(-1,1)
+                wl = self.exp.get_muse_wl()[spec_indices]
+                f750_array = self.exp.get_dominika_f750_2d(wl, all_obs[:, spec_indices])
+                all_obs[:, spec_indices] = all_obs[:, spec_indices] / f750_array.reshape(-1,1)
                 
                 
         # 2) Smoothing parameter 
@@ -285,13 +278,28 @@ class DataLoader(cINNConfig):
                 elif self.unc_sampling == 'uniform':
                     self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + self.lsig_max)
                     self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(self.lsig_max-self.lsig_min)/np.sqrt(12) ) )
+                    
+            elif self.unc_corrl == 'Seg_Flux':
+                if self.unc_sampling == 'uniform':
+                    lsig_max = self.lsig_min + 3
+                    self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + lsig_max)
+                    self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(lsig_max-self.lsig_min)/np.sqrt(12) ) )
+           
+            elif self.unc_corrl == 'Seg_Unif': # all sig componets are sampled from the same probability=p(sigma) but wl is segmented
+                if self.unc_sampling == 'uniform':
+                    self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + self.lsig_max)
+                    self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(self.lsig_max-self.lsig_min)/np.sqrt(12) ) )
+                elif self.unc_sampling == 'gaussian':  
+                    self.mu_s = np.zeros(len(self.y_names)) + self.lsig_mean
+                    self.w_s = np.diag( 1/(np.zeros(len(self.y_names)) + self.lsig_std) )
+                    
         
         if self.use_flag:
             self.mu_f = np.zeros(len(self.flag_names)) + 0.5*(0 + 1)
             self.w_f = np.diag( 1/( np.zeros(len(self.flag_names)) + abs(1-0)/np.sqrt(12) ) )
 
         if self.wavelength_coupling:
-            wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in self.y_names])] # 아직 get_coupling_wavelength는 안써보기로
+            wl = self.exp.get_muse_wl()[ self.exp.get_spec_index(self.y_names) ] # 아직 get_coupling_wavelength는 안써보기로
             data = np.random.choice(wl, len(wl)*1000)
             self.mu_wl = np.zeros(len(self.y_names)) + np.mean(data)
             self.w_wl =  np.diag( 1/( np.zeros(len(self.y_names)) + np.std(data) ) )
@@ -376,8 +384,87 @@ class DataLoader(cINNConfig):
             torch.utils.data.TensorDataset(all_x[test_split:], all_y[test_split:]),
             batch_size=batch_size, shuffle=True, drop_last=True)
         
+        
+        
         return test_loader, train_loader
     
+    
+    def get_real_data(self, rawval=True,
+                      normalize_flux=False, normalize_total_flux=False, normalize_mean_flux=False, normalize_f750 = False,):
+        
+        if self.prenoise_training:
+            s_names = [k.replace('l','s') for k in self.y_names]
+            rdata, sdata = self.exp.read_realdatabase(self.real_database, self.y_names, s_names=s_names) # read and only return usable y bins
+        else:
+            rdata = self.exp.read_realdatabase(self.real_database, self.y_names) # read and only return usable y bins
+        
+        # spec_indices = self.exp.get_spec_index(self.y_names)
+        # Normalize flux: using total flux (small values), using mean flux (factor of len(y_names))
+        if normalize_flux:
+            if normalize_total_flux:
+                rdata = rdata/np.sum(rdata, axis=1).reshape(-1,1)
+            elif normalize_mean_flux:
+                rdata = rdata/np.mean(rdata, axis=1).reshape(-1,1)
+            elif normalize_f750:
+                wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in self.y_names])]
+                f750_array = self.exp.get_dominika_f750_2d(wl, rdata)
+                rdata = rdata / f750_array.reshape(-1,1)
+        
+        if rawval == True:
+            if self.prenoise_training:
+                return (rdata, sdata)
+            else:
+                return rdata
+        else:
+            if self.prenoise_training:
+                return (self.obs_to_y(rdata), self.unc_to_sig(sdata))
+            else:
+                return self.obs_to_y(rdata)
+    
+    def get_da_loaders(self):
+        rawval = False
+        if self.prenoise_training==True:
+            rawval = True
+            real_y, real_s = self.get_real_data(rawval=rawval,
+                                    normalize_flux=self.normalize_flux, 
+                                    normalize_total_flux=self.normalize_total_flux, 
+                                    normalize_mean_flux=self.normalize_mean_flux, 
+                                    normalize_f750 = self.normalize_f750,
+                                    )
+            
+        else:
+            real_y = self.get_real_data(rawval=rawval,
+                                    normalize_flux=self.normalize_flux, 
+                                    normalize_total_flux=self.normalize_total_flux, 
+                                    normalize_mean_flux=self.normalize_mean_flux, 
+                                    normalize_f750 = self.normalize_f750,
+                                    )
+        
+        
+        # reform the size: batch_size x real_frac
+        n_rdb = len(real_y) # number in ddatabase
+        n_real = int(self.batch_size * self.real_frac) # number requested
+        
+        if self.prenoise_training:
+            if n_real == n_rdb:
+                loader = ( torch.Tensor(real_y), torch.Tensor(real_s) )
+            elif n_real > n_rdb: # make more
+                n_need = n_real - n_rdb
+                sel_ = np.random.choice(range(n_rdb), n_need)
+                loader = ( torch.Tensor( np.vstack([real_y, real_y[sel_]]) ), torch.Tensor( np.vstack([real_s, real_s[sel_]]) ) )
+            else: # chose
+                sel_=np.random.choice(range(n_rdb), n_real)
+                loader = ( torch.Tensor( real_y[sel_] ), torch.Tensor( real_s[sel_] ) )            
+        else:
+            if n_real == n_rdb:
+                loader = torch.Tensor(real_y)
+            elif n_real > n_rdb: # make more
+                n_need = n_real - n_rdb
+                loader = torch.Tensor( np.vstack([real_y, real_y[np.random.choice(range(n_rdb), n_need)]]) )
+            else: # chose
+                loader = torch.Tensor( real_y[np.random.choice(range(n_rdb), n_real)] )
+            
+        return loader
     
 
     """
@@ -397,11 +484,21 @@ class DataLoader(cINNConfig):
     """    
   
 
-    def create_uncertainty(self, size, expand=1, lum=None, ):
+    def create_uncertainty(self, size, expand=1, **kwarg):
         
-        kwarg = {}
+        # kwarg = {}
         for att in ['lsig_min', 'lsig_max', 'lsig_mean', 'lsig_std']:
             kwarg[att] = getattr(self, att)
+            
+        if 'Seg' in self.unc_corrl:
+            spec_indices = self.exp.get_spec_index(self.y_names)
+            wl = self.exp.get_muse_wl()[spec_indices]
+            kw_seg = {'seg_size':getattr(self, 'wl_seg_size'),  'wl':wl, 'maxlgap':3 } # basic settup. you can update by sending kwarg
+            kw_seg.update(kwarg)
+            kwarg = kw_seg
+            if self.unc_corrl=='Seg_Flux':
+                if 'flux' not in kwarg.keys():
+                    sys.exit("Flux is missing in random sigma sampling with Seg_Flux option")
             
         return self.exp.calculate_random_uncertainty(size, expand=expand, correlation=self.unc_corrl, sampling_method=self.unc_sampling,
                             **kwarg)

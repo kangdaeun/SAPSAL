@@ -176,6 +176,7 @@ Excluded param:
 import sys, os
 import importlib.util
 import numpy as np
+import re
 import torch # needed when load rescale params
 import copy
 from .models import *
@@ -214,32 +215,65 @@ class cINNConfig():
                     'normalize_mean_flux': None,
                     'normalize_f750': None,
                     
+                    'use_Hslab_veiling': None, #T/F
+                    'use_one_Hslab_model': None, #T/F
+                    
                     # Randomizing parameter on the fly
                     'random_parameters': None, # dictionary
                     'additional_kwarg': None, # dictionary : currently used for: Rv
 
                     # New: Coupling data [TEST]
                     'wavelength_coupling': False, #T/F
-
-
+                    
+                    # Domain adaptaion [TEST]
+                    'domain_adaptation': False, # T/F use domain adaption
+                    'real_database': None, # path to real database. will be updated with proj_dir
+                    'real_frac': 1, # fraction of real data with repect to the batch size: real_frac x batchsize
+                    'da_without_discriminator': False,
+                    
+                    'lambda_adv': 0.1, # 0 < < max?, loss = neg_log_llike + lambda_adv * loss_adv
+                    'da_disc_train_step': 1, # how frequently update weight: 1=every batch, if None, it automatically increase from 1
+                    'da_mode': 'simple', # genearll ADV, WGAN : this changes the way to calcualte loss
+                    'da_label_smoothing': False,  # label smoothing (real=0.9, fake=0.1)
+                    'da_adv_both': False, # if True use both fake and real in advloss
+                    
+                    'da_disc_width': 256, # discriminator width
+                    'da_disc_layer': 3, # discriminator layers'
+                    'da_disc_set_optim': False, # if False, optimizations are the same as main net, True. set differently
+                    
+                    'da_disc_lr_init': 1e-4, # learning rate for discriminator (Adam)
+                    'da_disc_adam_betas': (0.5, 0.9), # adam betas for for discriminator (Adam)
+                    'da_disc_l2_weight_reg':1e-4, # L2 regulatino for discriminator
+                    'da_disc_gamma':0.3, # gamma for discriminator
+                    'da_disc_meta_epoch': 10, # gamma for discriminator
+                    
+                    'da_warmup': 0, # i_epogh<=da_warmup: seperately train cINN (w/o adv) and Discriminator
+                    'da_disc_warmup_delay': 0, 
+                    
+                    'delay_cinn': 0 , # epoch to dealy cinn training. optimization starts from i_epoch >= delay_main (+da_warmup)
+                    'delay_disc': 0, # epoch to dealy discriminator training. optimization starts from i_epoch >= delay_main((+da_warmup))
+                    'da_stop_da': None, # epoch to stop DA (both disc and adv update)
+                    # weight schedulers are set as the same as main cINN
                     
                     # train_noisy_obs deprecated
                     # 'train_noisy_obs': False,
                     # 'n_noise_MC': None,
                     # 'noise_fsigma': None,
                     
-                    # prenoise training (noise as condition)
+                    # Noise-Net: prenoise training (noise as condition)
                     'prenoise_training': False, # T/F
-                    'unc_corrl': None, # 'Poisson', 'Ind_Unif', 'Ind_Man', 'Single'
+                    'unc_corrl': None, # 'Poisson', 'Ind_Unif', 'Ind_Man', 'Single', 'Seg_Unif',
                     'unc_sampling': None, # 'gaussian', 'uniform'
-                    'n_sig_MC': None, 
-                    'n_noise_MC': None,
+                    'n_sig_MC': None,  # deprecated
+                    'n_noise_MC': None, # deprecated
                     # for Poisson
                     'lsigb_mean': None, 'lsigb_std': None, # p( log(sig_b) ) = G(lsigb_mean, lsigb_std)
                     'lsigb_min': None, 'lsigb_max':None,
-                    # for Ind_Unif and Ind_Man
+                    # for general uniform or gaussian samplings in Ind_Unif, Ind_Man, Single, Seg_Unif
                     'lsig_mean': None, 'lsig_std':None, # array for Ind_Man, value for Ind_Unif
                     'lsig_min': None, 'lsig_max': None, 
+                    # when using wavelength segment
+                    'wl_seg_size': None, # wavelength segmentsize, in AA. 200 or 500A recommended
                     
                     # using flag (floag is additional conition)
                     'use_flag': False, # T/F
@@ -304,7 +338,7 @@ class cINNConfig():
         self.update_dimension()
         if self._projdir is not None:
             self.update_proj_dir()
-            
+        self.update_da_optim()
 
     
     # when you first declare, you will have this default setting
@@ -313,6 +347,8 @@ class cINNConfig():
             setattr(self, param, default_value)
         for param, default_value in cINNConfig.__hidden_parameter.items():
             setattr(self, param, default_value)
+        
+            
             
     def update_dimension(self):
         if self.x_names is not None:
@@ -340,6 +376,8 @@ class cINNConfig():
             self.filename = projdir + self.filename
         if change_tablename:
             self.tablename = projdir + self.tablename
+            if self.domain_adaptation:
+                self.real_database = projdir + self.real_database
         # if change_expander:
         #     self.expander = projdir + self.expander
         
@@ -350,6 +388,12 @@ class cINNConfig():
     def get_proj_dir(self):
         return self._projdir
     proj_dir = property(get_proj_dir) 
+    
+    def update_da_optim(self):
+        if self.da_disc_set_optim != True:
+            optim_params = ['lr_init','adam_betas', 'l2_weight_reg', 'gamma','meta_epoch']
+            for param in optim_params:
+                setattr(self, 'da_disc_'+param, getattr(self, param))
     
     
     # Rescale parameters
@@ -371,8 +415,7 @@ class cINNConfig():
         if self.wavelength_coupling:
             self.mu_wl = state_dicts['rescale_params']['mu_wl']#.astype(np.float32)
             self.w_wl = state_dicts['rescale_params']['w_wl']#.astype(np.float32)
-        
-    
+      
     
     def obs_to_y(self, observations):
         # y = np.log(observations)
@@ -463,7 +506,7 @@ class cINNConfig():
     def load_network_model(self):
         self.network_model = eval(self.model_code)(self)
         self.network_model.load(self.filename, device=self.device)
-    
+        self.network_model.eval() # start with evaluation mode
     
     
     
@@ -582,7 +625,7 @@ class cINNConfig():
     def read_config(self, config_file, proj_dir=None, verbose=True,
                     change_filename=True, change_tablename=True): #, change_expander=True):
         # declare empty class and read python file
-        import importlib.util
+        # import importlib.util
         if config_file[-3:]!='.py':
             config_file+='.py'
             
@@ -599,6 +642,7 @@ class cINNConfig():
                     except Exception as e:
                         print(e)
             self.update_dimension()
+            self.update_da_optim()
             self.config_file = config_file
             if proj_dir is not None:
                 self.set_proj_dir(proj_dir, change_filename=change_filename, 
@@ -614,6 +658,39 @@ class cINNConfig():
             sys.exit(e)
             
             
+    def find_str_names(self, config_file, dim_max=20):
+    
+        n_x = len(self.x_names); n_y = len(self.y_names)
+        if n_x <= dim_max and n_y <= dim_max:
+            return None, None
+        else:
+            with open(config_file, 'r') as f:
+                text = f.read()
+        
+            # Remove comments to avoid confusions
+            text = re.sub(r'("""|\'\'\')(.*?)\1', '', text, flags=re.DOTALL)
+        
+            lines = text.split('\n')
+            config_components = []
+            for line in lines:
+                stripped = line.split('#')[0].rstrip()  # # 이후 삭제
+                if stripped:  # 빈 줄은 제외
+                    config_components.append(stripped)
+            
+            if n_x > dim_max:
+                i_comp = np.where( np.array([("x_names" in comp) and ("#" not in comp) for comp in config_components]))[0][0]
+                str_x_names = config_components[i_comp].split("=")[-1].strip()
+            else:
+                str_x_names = None
+                
+            if n_y > dim_max:
+                i_comp = np.where( np.array([("y_names" in comp) and ("#" not in comp) for comp in config_components]))[0][0]
+                str_y_names = config_components[i_comp].split("=")[-1].strip()
+            else:
+                str_y_names = None
+                
+            return str_x_names, str_y_names
+                
     
     
     def write_config(self, config_comment = None, str_x_names = None, str_y_names=None,
@@ -726,6 +803,13 @@ class cINNConfig():
             contents.append(simple_sentence(self, "normalize_f750"))
         new_line(contents)
         
+        # Option on veiling
+        if self.use_Hslab_veiling:
+            contents.append( "# Veiling option (using Hydrogen Slab model for veiling)")
+            contents.append(simple_sentence(self, "use_Hslab_veiling"))
+            contents.append(simple_sentence(self, "use_one_Hslab_model"))
+        new_line(contents)
+        
         # [deprecated] if you turn on noisy training
         # contents.append(simple_sentence(self, "train_noisy_obs"))
         # contents.append( "train_noisy_obs = %s"%(self.train_noisy_obs) )
@@ -735,7 +819,7 @@ class cINNConfig():
         # new_line(contents)  
         
         # if your use prenoise training (N/S as additional condition)
-        contents.append('# Prenoise training (Soft training): Use dY/Y as additional conditions')
+        contents.append('# Prenoise training (Noise-Net): Use dY/Y as additional conditions')
         contents.append(simple_sentence(self, "prenoise_training"))
         if self.prenoise_training == True:
             contents.append(simple_sentence(self, "n_sig_MC", comment="This must be 1 (will be deprecated)"))
@@ -751,6 +835,8 @@ class cINNConfig():
                 _to_write += ["lsig_mean", "lsig_std"]
             elif self.unc_sampling == 'uniform':
                 _to_write += ["lsig_min", "lsig_max"]
+            if 'Seg' in self.unc_corrl:
+                _to_write += ['wl_seg_size']
             for param in _to_write:
                 contents.append(simple_sentence(self, param))
         new_line(contents)
@@ -775,6 +861,32 @@ class cINNConfig():
         contents.append(simple_sentence(self, "wavelength_coupling") )
         new_line(contents)
             
+        # If you use Domain Adaptaion 
+        contents.append('# Domain Adaptaion: Use real data to improve simulation gap')
+        contents.append(simple_sentence(self, "domain_adaptation"))
+        if self.domain_adaptation == True:
+            contents.append("# Path to the real database to be used for domain adaptation")
+            contents.append(simple_sentence(self, "real_database", comment="path will be updated with proj_dir"))
+            contents.append(simple_sentence(self, "real_frac", comment="fraction of real data with repect to the batch size (real_frac x batchsize)"))
+            contents.append(simple_sentence(self, "da_mode", comment="Mode to calculate discriminator loss :simple/WGAN"))
+            if self.da_mode=='simple':
+                contents.append(simple_sentence(self, "lambda_adv", comment="Loss = NLL + lambda_adv * L_adv, >0"))
+            contents.append(simple_sentence(self, "da_disc_train_step", comment="how frequently update weight: 1=every batch, if None, it automatically increases from 1 dependin on epoch"))
+            contents.append(simple_sentence(self, "delay_cinn", comment="epoch to dealy cinn training. optimization starts from i_epoch >= delay_main"))
+            contents.append(simple_sentence(self, "delay_disc", comment="epoch to dealy discriminator training. optimization starts from i_epoch >= delay_disc"))
+            
+            
+            contents.append("# Discriminator construction")
+            contents.append(simple_sentence(self, "da_disc_width", comment="Width of Discriminator"))
+            contents.append(simple_sentence(self, "da_disc_layer", comment="# of layers of Discriminator"))
+            contents.append(simple_sentence(self, "da_disc_set_optim", comment="if False, optimization parameters are the same as main cINN, True. set differently"))
+            if self.da_disc_set_optim:
+                contents.append("# Discriminator learning optimization")
+                for param in ["gamma", "lr_init", "l2_weight_reg", "adam_betas", "meta_epoch"]:
+                    contents.append(simple_sentence(self,'da_disc_'+param))
+            # contents.append('# Currently, discriminator optimization uses adam betas, lr_init, meta_epoch, gamma from main network')
+        new_line(contents)
+        
         
         # ============ parameters in cNN_parameters.py ===========
         # training hyperparameters: device, batchsize, epoch, 
@@ -796,7 +908,7 @@ class cINNConfig():
         contents.append(simple_sentence(self, "load_file"))
         new_line(contents)
         
-        for param in ["checkpoint_save", "checkpoint_save_interval", "checkpoint_save_overwrite"]:
+        for param in ["checkpoint_save", "checkpoint_save_interval", "checkpoint_save_overwrite", "checkpoint_remove_after_training"]:
             contents.append(simple_sentence(self, param))
         new_line(contents)
         

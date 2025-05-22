@@ -9,6 +9,7 @@ Tools for run_hypertrain
 
 """
 import numpy as np
+import re
 
 def rand_in(a, b):
     '''
@@ -36,15 +37,25 @@ def rand_bool():
     return bool(np.random.randint(2))
 
 
-
-def find_str_names(c, config_file, dim_max=20):
     
+def find_str_names(c, config_file, dim_max=20):
+
     n_x = len(c.x_names); n_y = len(c.y_names)
     if n_x <= dim_max and n_y <= dim_max:
         return None, None
     else:
-        with open(config_file, 'r') as f1:
-            config_components = f1.read().split('\n')
+        with open(config_file, 'r') as f:
+            text = f.read()
+    
+        # Remove comments to avoid confusions
+        text = re.sub(r'("""|\'\'\')(.*?)\1', '', text, flags=re.DOTALL)
+    
+        lines = text.split('\n')
+        config_components = []
+        for line in lines:
+            stripped = line.split('#')[0].rstrip()  # # 이후 삭제
+            if stripped:  # 빈 줄은 제외
+                config_components.append(stripped)
         
         if n_x > dim_max:
             i_comp = np.where( np.array([("x_names" in comp) and ("#" not in comp) for comp in config_components]))[0][0]
@@ -59,6 +70,7 @@ def find_str_names(c, config_file, dim_max=20):
             str_y_names = None
             
         return str_x_names, str_y_names
+            
     
     
 def find_str_flag_names(c, config_file, dim_max=5):
@@ -93,7 +105,7 @@ def find_str_flag_names(c, config_file, dim_max=5):
     
     
 def randomize_config(c_ref, search_parameters, output_filename,
-                     device, n_epochs_max,
+                     device, #n_epochs_max,
                      adjust_gamma_n_epoch=False,
                      auto_n_epoch=False,
                      hs_id=None):
@@ -126,8 +138,14 @@ def randomize_config(c_ref, search_parameters, output_filename,
         setattr(c, key, func_key(**qwargs_key) )
         
         
+    # If using domain adaption and da_disc_set_optim = False, set da_disc setting same as main network
+    if c.domain_adaptation:
+        if c.da_disc_set_optim != True:
+            c.update_da_optim()
+        
+        
     # Set all verbosity switches to False 
-    c.checkpoint_save = False
+    # c.checkpoint_save = False
     c.progress_bar = False
     c.live_visualization = False
     
@@ -137,9 +155,9 @@ def randomize_config(c_ref, search_parameters, output_filename,
         elif c.gamma >= 0.5 and c.n_epochs < 200:
             c.n_epochs = 200
         
-    # Limit n_epochs ( <= N_EPOCHS_MAX )
-    if c.n_epochs > n_epochs_max: 
-        c.n_epochs = n_epochs_max
+    # Limit n_epochs ( <= N_EPOCHS_MAX ) : not used anymore
+    # if c.n_epochs > n_epochs_max: 
+    #     c.n_epochs = n_epochs_max
     
     return c
     

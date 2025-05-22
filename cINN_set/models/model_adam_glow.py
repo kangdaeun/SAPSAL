@@ -50,13 +50,25 @@ class ModelAdamGLOW(nn.Module):
         self.cond_net = FeatureNet(c)
         self.cond_net.to(c.device)
         self.model = self.build_network(c)
+        if c.domain_adaptation:
+            if not c.da_without_discriminator:
+                self.da_disc = DADiscriminator(c)
+                self.da_disc.to(c.device)
+            else:
+                self.da_disc = None
+            # don't add domain adaptaion discriminator parameter in cinn training.
+        else: 
+            self.da_disc = None
         
-        self.params_trainable = list(filter(lambda p: p.requires_grad, self.model.parameters()))
-        
+        self.params_trainable_INN = list(filter(lambda p: p.requires_grad, self.model.parameters()))
         torch.manual_seed(c.seed_weight_init)
-        for p in self.params_trainable:
+        for p in self.params_trainable_INN:
              p.data = c.init_scale * torch.randn(p.data.shape).to(c.device)
-        self.params_trainable += list(self.cond_net.parameters())
+        self.params_trainable = self.params_trainable_INN + list(self.cond_net.parameters())
+        
+        # Add domaina DA disk as one optimization
+        # if c.domain_adaptation:
+        #     self.params_trainable += list(self.da_disc.parameters())
         
         self.optim = torch.optim.Adam(self.params_trainable, lr=c.lr_init, betas=c.adam_betas, eps=1e-6, weight_decay=c.l2_weight_reg)
         self.weight_scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=c.meta_epoch, gamma=c.gamma)
@@ -66,22 +78,9 @@ class ModelAdamGLOW(nn.Module):
     
     def build_network(self, c):
         
-#        if c.FrEIA_ver == 0.1:
-#            Ff = Ff0p1; Fm = Fm0p1
-#            INN = Ff.ReversibleGraphNet
-#        elif c.FrEIA_ver == 0.2:
-#            Ff = Ff0p2; Fm = Fm0p2
-#            INN = Ff.GraphINN
-#        else: # 2022.1.10. currently using 0.1 as default
-#            Ff = Ff0p1; Fm = Fm0p1
-#            INN = Ff.ReversibleGraphNet
         # 2023. 8. 11. FrEIA_ver deprecated (use FrEIA >= 0.2 in cINN_set)
         INN = Ff.GraphINN
-        
-        # def fc_constr(c_in, c_out):
-        #     return nn.Sequential(nn.Linear(c_in, c.internal_width), nn.ReLU(),
-        #                          nn.Linear(c.internal_width,  c.internal_width), nn.ReLU(),
-        #                          nn.Linear(c.internal_width,  c_out))
+    
         
         def fc_constr(c_in, c_out):
             layers = [ nn.Linear(c_in, c.internal_width), nn.ReLU() ]
@@ -118,15 +117,20 @@ class ModelAdamGLOW(nn.Module):
         
         
     def save(self, name):
-        torch.save({'opt':self.optim.state_dict(),
+        dic = {'opt':self.optim.state_dict(),
                     'net':self.model.state_dict(),
                     'cond_net':self.cond_net.state_dict(),
-                    'rescale_params':self.rescale_params}, name)
+                    'rescale_params':self.rescale_params}
+        if self.da_disc is not None:
+            dic['da_disc'] = self.da_disc.state_dict() 
+        torch.save(dic, name)
 
     def load(self, name, device='cpu'):
         state_dicts = torch.load(name, map_location=torch.device(device), weights_only=False)
         self.model.load_state_dict(state_dicts['net'])
         self.cond_net.load_state_dict(state_dicts['cond_net'])
+        if self.da_disc is not None:
+            self.da_disc.load_state_dict(state_dicts['da_disc'])
         try:
             self.optim.load_state_dict(state_dicts['opt'])
         except ValueError:
@@ -138,3 +142,36 @@ class ModelAdamGLOW(nn.Module):
             print('Rescale parameter dictionary is not saved in the model file')
        
     
+class DADiscriminator(nn.Module):
+    def __init__(self, c):
+        super().__init__()
+        
+        layers = [nn.Linear(c.y_dim_features, c.da_disc_width), nn.ReLU()]#, nn.Dropout(0.5)]
+        for i_layer in range(1, c.da_disc_layer-1):
+            layers += [ nn.Linear(c.da_disc_width, c.da_disc_width), nn.ReLU()]#,nn.Dropout(0.5)]
+        layers += [ nn.Linear(c.da_disc_width, c.da_disc_width//2), nn.ReLU() ]
+        layers += [ nn.Linear(c.da_disc_width//2, 1)]
+        self.linear = nn.Sequential(*layers)
+        
+        # Test: optimize with main network
+        # Define optimizer: Adam
+        # torch.manual_seed(c.seed_weight_init)
+        # for p in self.parameters():
+        #      p.data = c.init_scale * torch.randn(p.data.shape).to(c.device)
+        self.optim = torch.optim.Adam(self.parameters(), lr=c.da_disc_lr_init, betas=c.da_disc_adam_betas, eps=1e-6, weight_decay=c.da_disc_l2_weight_reg)
+        self.weight_scheduler = torch.optim.lr_scheduler.StepLR(self.optim, step_size=c.da_disc_meta_epoch, gamma=c.da_disc_gamma)
+
+    def forward(self, x):
+        return self.linear(x)
+
+    def classify_discriminator_output(self, x):
+        probs = torch.sigmoid(self.linear(x))  # 확률로 변환
+        return (probs > 0.5).float()
+    
+    def optim_step(self):
+        self.optim.step()
+        self.optim.zero_grad()
+        
+    def scheduler_step(self):
+        self.weight_scheduler.step()
+

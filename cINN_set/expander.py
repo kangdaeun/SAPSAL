@@ -23,15 +23,44 @@ def read_database(tablename):
 def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic=None, f_max_dic=None):
     
     # table_cols = table.columns.values.tolist()
-    
-    # check all x in table_cols
+
     if random_parameters is None:
         params = table.loc[:, x_names].values # if all x_names in table already, just read
+        spec = table.loc[:, y_names].values
+        
     else:
-        params = np.zeros(shape=(len(table), len(x_names)))
+        rparams = list(random_parameters.keys())
+        xn_in_rp = [k for k in x_names if k in rparams ]
+        yn_in_rp = [k for k in y_names if k in rparams ]
+        
+        xn_nin_rp = [k for k in x_names if k not in rparams ]
+        yn_nin_rp = [k for k in y_names if k not in rparams ]
+        
+        params = table.loc[:, xn_nin_rp]
+        spec = table.loc[:, yn_nin_rp]
+        
         np.random.seed(int(random_seed))
-        for i_param, param in enumerate(x_names):
-            if param in random_parameters.keys(): # if you need randomized parameter
+        
+        if len(xn_in_rp)>0:
+            for param in xn_in_rp:
+                mini, maxi = random_parameters[param]
+                f_min, f_max = 0., 0.
+                try: 
+                    f_min = f_min_dic[param]
+                except: 
+                    pass
+                try:
+                    f_max = f_max_dic[param]
+                except:
+                    pass
+                
+                ii = x_names.index(param)
+                rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
+                                                               f_min=f_min, f_max=f_max)
+                params.insert(ii, param, rval)
+                
+        if len(yn_in_rp)>0:
+            for param in yn_in_rp:
                 mini, maxi = random_parameters[param]
                 f_min, f_max = 0., 0.
                 try:
@@ -43,17 +72,14 @@ def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_
                 except:
                     pass
                 
-                params[:, i_param] = generate_random_parameter(len(table), min_value=mini, max_value=maxi,
+                ii = y_names.index(param)
+                rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
                                                                f_min=f_min, f_max=f_max)
-            else:
-                params[:, i_param] = table.loc[:, param].values
-        
-                    
-    if len(y_names) < 3681:
-        spec = table.loc[:, y_names].values
-    else:
-        spec = table.loc[:, ['l{:d}'.format(i) for i in range(3681)]].values
-    
+                spec.insert(ii, param, rval)
+                
+        params = params.values
+        spec = spec.values
+
     return (params, spec)
 
 
@@ -103,6 +129,18 @@ def generate_random_parameter(N_data, min_value = None, max_value = None,
 
     return values
 
+def get_spec_index(y_names, get_name=False):
+    # filter out indices for spectral bins : l2, l231, from y_names:
+        
+    # [s for s in c.y_names if s.startswith('l') and s[1:].isdigit()][-1]
+    indices = np.array([i for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()])
+    names = np.array([s for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()])
+    
+    
+    if get_name:
+        return names
+    else:
+        return indices
 
 def cardelli_extinction(wave, Av, Rv):
     # If you use it to apply a reddening to a spectrum, multiply it for the result of
@@ -248,7 +286,7 @@ def get_coupling_wavelength(y_names):
     # return np.repeat(wl.reshape(1,-1), N_data, axis=0)
     
 # for domain adaptation 
-def read_realdatabase(tablename, y_names): # read and only return usable y bins
+def read_realdatabase(tablename, y_names, s_names=None): # read and only return usable y bins
     real_table = pd.read_csv(tablename)
   
     if len(y_names) < 3681:
@@ -256,7 +294,11 @@ def read_realdatabase(tablename, y_names): # read and only return usable y bins
     else:
         spec = real_table.loc[:, ['l{:d}'.format(i) for i in range(3681)]].values
     
-    return spec
+    if s_names is not None:
+        sigma = real_table.loc[:, s_names].values
+        return (spec, sigma)
+    else:
+        return spec
 
 
 """
@@ -384,9 +426,9 @@ def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=False):
     temp = (t2-t1)/(n2-n1)*(sptnum - n1) + t1
     return temp
 
-def convert_spt_to_temp(spt, option=None, out_nan=False):
+def convert_spt_to_temp(spt, option='Tpl', out_nan=False):
     return convert_sptnum_to_temp( convert_spt_to_num(spt), option=option, out_nan=out_nan )
-def convert_temp_to_spt(temp, option=None, out_nan=False):
+def convert_temp_to_spt(temp, option='Tpl', out_nan=False):
     return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan))
 
 # upgraded version
@@ -513,7 +555,9 @@ correlation (correlation between different sigmas in one obs):
 sampling method: gaussian, uniform ([min, max), but exchange=> (min, max] )
 """    
 def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_method=None,
-                       lsig_mean=None, lsig_std = None, lsig_min=None, lsig_max=None, ):
+                       lsig_mean=None, lsig_std = None, lsig_min=None, lsig_max=None,
+                       flux=None, wl=None, **kwarg ):
+    # flux: whole spectrum. includ masked area. 
     
     if len(size)==1:
         oned = True
@@ -525,7 +569,7 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
         size = (int(size[0]*expand), size[1] )
         
         
-    if correlation == 'Ind_Unif': # all y components have the same p(sigma)
+    if correlation == 'Ind_Unif': # all sig components are sampled from the same probability=p(sigma)
         if sampling_method == 'gaussian': # N(mean, std)  
             rn = np.random.randn(*size)*lsig_std + lsig_mean
         elif sampling_method == 'uniform': # [min, max)
@@ -548,6 +592,26 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
         elif sampling_method == 'uniform': # [min, max)
             rn = np.random.rand(lsig.shape[0])*(lsig_max - lsig_min) + lsig_min
         lsig += np.repeat(rn.reshape(-1,1), lsig.shape[1], axis=1)
+        
+    elif correlation == 'Seg_Flux': # sigma sampled follwoing the flux. only uniform available
+        if sampling_method == 'uniform': # [min, max)
+            iseg_list = divide_wl_segment(wl, **kwarg) # Don;t need to set start and end -> automatically set
+            # default seg_size = 200AA
+            lsig = random_lsig_seg_flux_uniform(flux, iseg_list, lsig_min0=lsig_min, lsig_max0=lsig_max, **kwarg)
+            
+    elif correlation == 'Seg_Unif': # all sig componets are sampled from the same probability=p(sigma) but wl is segmented
+        iseg_list = divide_wl_segment(wl, **kwarg) # seg_size must be in kwarg  
+        lsig = np.zeros(size)
+        for iseg, ind_seg in enumerate(iseg_list):
+            if sampling_method=='uniform':
+                lsig[:, ind_seg] = (np.random.rand(size[0]) * (lsig_max - lsig_min) + lsig_min).reshape(-1,1)
+            elif sampling_method=='gaussian':
+                lsig[:, ind_seg] = (np.random.randn(size[0]) * lsig_std + lsig_mean).reshape(-1,1)
+
+            
+    # elif correlation =='Seg_Poisson': # random for only the min Sig (maxFlux), other seg are determined by Poisson
+    #     # sampling method only determines how to sample the minSig
+    #     iseg_list = divide_wl_segment(wl, **kwarg) # Don;t need to set start and end -> automatically set
     else:
         print('correlation is not set (Ind_Man, Ind_Unif, Single)')
         return None
@@ -557,26 +621,80 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
     
     return lsig
 
-
-def divide_wl_segment(wl, start=1000, end=12000, seg_size=500):
+def random_lsig_seg_flux_uniform(flux, iseg_list, lsig_min0, lsig_max0, upper_limit=True, maxlgap=3, **kwarg):
     """
-    make wavelength segment for uncertainty sampling
-
+    Sampling random sigma based on flux of spectrum (segmented)    
+    
     Parameters
     ----------
-    wl : TYPE
-        wavelength of spectrum used as input to the network
-    start : treated minimum wavelength. for optical it is 1000A
-        DESCRIPTION. The default is 1000.
-    end : TYPE, optional
-        DESCRIPTION. The default is 12000.
-    seg_size : segment size. 200A, 500A , 1000A, ,
-        DESCRIPTION. The default is 500.
+    flux : flux array including whole MUSE spectral bins. [n_obs x n_spec_bins]
+    iseg_list : list of wl segement indices generated from divide_wl_segment
+    lsig_min0 : min value of U(a,b) for the lowest sigma (highest flux segment)
+    lsig_max0 : max value of U(a,b) for the lowest sigma (highest flux segment)
+    upper_limit : T/F optional
+        If True, highest value of log sig is limited to sig_lowest * 10^maxlgap. The default is True.
+    maxlgap : set gatp optional
+        limit highest value of log sig is limited to sig_lowest * 10^maxlgap. The default is 3.
+        3 means sig_max is limited to lowest * 1e3
 
     Returns
     -------
-    iseg_list : TYPE
-        DESCRIPTION.
+    lsig : 2D array, the same shape as flux [n_obs x n_spec_bins]
+        log sigma. sampled from uniform distribution. But p(sigma) differes in each segment
+
+    """
+    n_seg = len(iseg_list)
+    flux = flux.reshape(-1, flux.shape[-1]) # make 2D flux array
+    
+    # Set order basedon median flux at each seg
+    medflux_seg = np.zeros(shape=(flux.shape[0], n_seg))
+    for iseg, ind_seg in enumerate(iseg_list):
+        medflux_seg[:, iseg] = np.nanmedian(flux[:, ind_seg], axis=1)
+    arg_flux = np.argsort(medflux_seg, axis=1)[:, ::-1] # 2D. n_obs x n_seg
+
+    lsig = np.zeros(flux.shape)
+
+    for i_obs, arg in enumerate(arg_flux):
+        lsig_seg = np.zeros(len(arg))
+        fseg = medflux_seg[i_obs]
+        fseg_max = fseg[arg[0]] # arg[0] segment with the highest flux 
+        for j_seg, j in enumerate(arg):
+            if j_seg==0: # segment with the highest flux
+                lsig_seg[j] = np.random.uniform(low=lsig_min0, high=lsig_max0, size=1)[0]
+            else:
+                low = lsig_seg[arg[j_seg-1]] # low(n) = previous lsig
+                # high = lsig_seg[arg[j_seg-1]] + np.log10(np.sqrt(fseg_max/fseg[j])) # U( sig(n-1), sig(n-1) x Possion ratio -> as maximum
+                high = lsig_seg[arg[0]] + np.log10(np.sqrt(fseg_max/fseg[j]) )  # U( sig(n-1), sig(n-1) x Possion ratio  x2-> as maximum
+                if upper_limit:
+                    # avoid large gap between sig_min and sig_max
+                    # for example, lowest + 3 = lsig_seg[arg[0]] + 3 (maxlgap) # largest sigma is not bigger than 1000xlowsest sigma
+                    high=np.min([high, lsig_seg[arg[0]] + maxlgap])
+                lsig_seg[j] = np.random.uniform(low=low, high=high, size=1)[0]
+            lsig[i_obs][iseg_list[j]] = lsig_seg[j]
+
+    return lsig
+
+
+def divide_wl_segment(wl, start=1000, end=12000, seg_size=500, **kwarg):
+    """
+    make wavelength segment for uncertainty sampling
+    return list of indices
+
+    Parameters
+    ----------
+    wl : arry of wavelength (give whole spectral range)
+        wavelength of spectrum used as input to the network
+    start : value. treated minimum wavelength. for optical it is 1000A
+        The default is 1000. You can set to cut the wavelength but in general it is not needed
+    end : value. treated maximum wavelength., optional
+        The default is 12000.
+    seg_size : segment size. 200A, 500A , 1000A, the same unit as wl
+        The default is 500 (AA)
+
+    Returns
+    -------
+    iseg_list : list of arrays that contatining indices for each segment
+        
 
     """
     wl_min = np.min(wl); wl_max = np.max(wl)
@@ -589,7 +707,7 @@ def divide_wl_segment(wl, start=1000, end=12000, seg_size=500):
     else:
         end = np.ceil(wl_max/seg_size)*seg_size
     
-    n_seg = (end-start)/seg_size
+    n_seg = int((end-start)/seg_size)
     iseg_list = []
     for i_seg in range(n_seg):
         iseg_list.append( np.where( (wl >= start+seg_size*i_seg)*(wl < start+seg_size*(i_seg+1)) )[0] )
@@ -631,14 +749,24 @@ title_dic = {
 } 
 
 
-   
-# title_dic = {}
+def get_title(key, unit=True):
+    if unit:
+        try:
+            return title_unit_dic[key]
+        except:
+            return key
+    else:
+        try:
+            return title_dic[key]
+        except:
+            return key
+
     
 """
 Useful functions for analysis
 """
 def calculate_uncertainty(parameter_distr, astro, confidence=68, percent=True,
-                          add_Teff=False,
+                          add_Teff=False, spt_scale=None, return_percentile=False,
                           ):
                           # exclude_infinite=True, exclude_unphysical=False, **kwarg):
     
@@ -671,9 +799,9 @@ def calculate_uncertainty(parameter_distr, astro, confidence=68, percent=True,
     if add_Teff:
         if 'logTeff' not in astro.x_names:
             add_Teff = False
-       
-        
+
     unc_list = []
+    per_list = []
     if len(parameter_distr) > 0.1*npost:
         q_low  = 100. * 0.5 * (1 - confidence)
         q_high = 100. * 0.5 * (1 + confidence)    
@@ -681,18 +809,28 @@ def calculate_uncertainty(parameter_distr, astro, confidence=68, percent=True,
         for i, param in enumerate(astro.x_names): 
             x_low, x_high = np.nanpercentile(parameter_distr[:, i], [q_low, q_high])
             unc_list.append(x_high - x_low)
+            per_list.append([x_low, x_high])
             
         if add_Teff:
             i_logTeff = astro.x_names.index('logTeff')
             x_low, x_high = np.nanpercentile(parameter_distr[:, i_logTeff], [q_low, q_high])
             unc_list.append( 10**x_high - 10** x_low)
-        
+            per_list.append([10** x_low, 10**x_high])
     else:
         unc_list = [np.nan]*len(astro.x_names)
+        per_list = [[np.nan,np.nan]]*len(astro.x_names)
         if add_Teff:
             unc_list.append(np.nan)
-         
-    return np.array(unc_list)
+            per_list.append([[np.nan,np.nan]])
+    
+    unc_list = np.array(unc_list)
+    per_list = np.array(per_list)
+            
+    if return_percentile:
+        return (unc_list, per_list)
+        
+    else:
+        return unc_list
 
 
 # calculate_map, if plot=True, give simple horizontal figure
@@ -765,7 +903,8 @@ def calculate_map(parameter_distr, astro,
         title = param
         
         # KDE
-        roi_kde = np.array([True]*len(parameter_distr))
+        # roi_kde = np.array([True]*len(parameter_distr))
+        roi_kde = np.isfinite(post)
         
         if use_percentile is not None:
             if (use_percentile > 0)*(use_percentile <100):
@@ -778,7 +917,7 @@ def calculate_map(parameter_distr, astro,
         if np.sum(roi_kde) > 0.1*npost:
             kde = FFTKDE(kernel='gaussian', bw=bw_method).fit(post[roi_kde])
             
-            pmin, pmax = min(post[roi_kde]), max(post[roi_kde])
+            pmin, pmax = np.nanmin(post[roi_kde]), np.nanmax(post[roi_kde])
             x_grid = np.linspace( pmin - (pmax-pmin)/(n_grid*2), pmax + (pmax-pmin)/(n_grid*2), n_grid)
             y_grid = kde.evaluate(x_grid)
             x_map = x_grid[np.argmax(y_grid)]
