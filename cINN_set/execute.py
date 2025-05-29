@@ -13,6 +13,7 @@ from torch.nn.functional import binary_cross_entropy_with_logits
 # from torch.autograd import Variable
 import numpy as np
 import tqdm
+import gc
 # import matplotlib
 # import matplotlib.pyplot
 # matplotlib.use('Agg')
@@ -339,6 +340,7 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
         
         #%% Training start
         while (training_status == 0 and i_epoch < max_epoch-1):
+            epoch_start = time()
             i_epoch += 1
         
             test_loader, train_loader = data.get_loaders( param_seed = i_epoch) # param_seed will randomize parameter if random_parameters is set
@@ -475,43 +477,40 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
     
                 x, y = data_tuple
                 
-                # Noise-Net: prenoise training
-                # In prenoise training, data are in physical scale (param, obs)
-                if c.prenoise_training:
-                    ymin = torch.min(abs(y), dim=1).values # minimum value for each 
-                    # unc_corrl, unc_sampling etc are considerd 
-                    if c.unc_corrl=='Seg_Flux':
-                        flux = y.detach().cpu().numpy()
-                    else: 
-                        flux=None
-                    sig = torch.Tensor( data.create_uncertainty(tuple(y.shape), expand=c.n_sig_MC, flux=flux  ) ) # n_rows = B x n_sig_MC
-                    if c.n_sig_MC*c.n_noise_MC > 1:
-                        # N_mc expansion (n_noise_MC) + noise sampling (all line independent)
-                        x = torch.repeat_interleave(x, c.n_sig_MC*c.n_noise_MC, dim=0) 
-                        y = torch.repeat_interleave(y, c.n_sig_MC*c.n_noise_MC, dim=0)
-                        sig = torch.repeat_interleave(sig, c.n_noise_MC, dim=0)
-                    y = torch.clip( y * (1+ (10**(sig))*torch.randn(y.shape[0], y.shape[1]) ), min=ymin.reshape(-1,1) ) # all line independent
+                # # Noise-Net: prenoise training => 2025.05.28 This is moved to data_loader. Now alwasy get_loader return rescaled values
+                # # In prenoise training, data are in physical scale (param, obs)
+                # if c.prenoise_training:
+                #     ymin = torch.min(abs(y), dim=1).values # minimum value for each 
+                #     # unc_corrl, unc_sampling etc are considerd 
+                #     if c.unc_corrl=='Seg_Flux':
+                #         flux = y.detach().cpu().numpy()
+                #     else: 
+                #         flux=None
+                #     sig = torch.Tensor( data.create_uncertainty(tuple(y.shape), expand=c.n_sig_MC, flux=flux  ) ) # n_rows = B x n_sig_MC
+                #     if c.n_sig_MC*c.n_noise_MC > 1:
+                #         # N_mc expansion (n_noise_MC) + noise sampling (all line independent)
+                #         x = torch.repeat_interleave(x, c.n_sig_MC*c.n_noise_MC, dim=0) 
+                #         y = torch.repeat_interleave(y, c.n_sig_MC*c.n_noise_MC, dim=0)
+                #         sig = torch.repeat_interleave(sig, c.n_noise_MC, dim=0)
+                #     y = torch.clip( y * (1+ (10**(sig))*torch.randn(y.shape[0], y.shape[1]) ), min=ymin.reshape(-1,1) ) # all line independent
                     
-                    # Transform to rescaled: np array again
-                    x = torch.Tensor(data.params_to_x(x))
-                    y = torch.hstack((torch.Tensor(data.obs_to_y(y)), torch.Tensor(data.unc_to_sig(10**sig))))
+                #     # Transform to rescaled: np array again
+                #     x = torch.Tensor(data.params_to_x(x))
+                #     y = torch.hstack((torch.Tensor(data.obs_to_y(y)), torch.Tensor(data.unc_to_sig(10**sig))))
                 
                 x, y = x.to(c.device), y.to(c.device)
-                # features = model.cond_net.features(y)
+      
 
                 # Domain Adaptaion
                 # Discriminator loss calculation
                 if c.domain_adaptation: 
-                    # if using presnoise and expansion: expand as well
-                    if c.prenoise_training:
-                        y_real = data_real
-                        s_real = err_real
-                        if c.n_sig_MC*c.n_noise_MC > 1:
-                            y_real = torch.repeat_interleave(y_real, c.n_sig_MC*c.n_noise_MC, dim=0) 
-                            s_real = torch.repeat_interleave(s_real, c.n_sig_MC*c.n_noise_MC, dim=0) 
-                        y_real = torch.hstack((torch.Tensor(data.obs_to_y(y_real)), torch.Tensor(data.unc_to_sig(s_real)))).to(c.device)
-                    else:
-                        y_real = data_real.to(c.device)
+                    # Curretnly domain adaptaion is not applied to prenoise training
+                    # if c.prenoise_training:
+                    #     y_real = data_real
+                    #     s_real = err_real
+                    #     y_real = torch.hstack((torch.Tensor(data.obs_to_y(y_real)), torch.Tensor(data.unc_to_sig(s_real)))).to(c.device)
+                    # else:
+                    y_real = data_real.to(c.device)
                         
                     if turnoff_condnet:
                         for param in model.cond_net.parameters():
@@ -646,21 +645,6 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                                                   ncols=83):
     
                 x, y = test_tuple
-
-                if c.prenoise_training:
-                    ymin = torch.min(abs(y), dim=1).values # minimum value for each 
-                    # unc_corrl, unc_sampling etc are considerd 
-                    sig = torch.Tensor( data.create_uncertainty(tuple(y.shape), expand=c.n_sig_MC ) ) # n_rows = B x n_sig_MC
-                    if c.n_sig_MC*c.n_noise_MC > 1:
-                        # N_mc expansion (n_noise_MC) + noise sampling (all line independent)
-                        x = torch.repeat_interleave(x, c.n_sig_MC*c.n_noise_MC, dim=0) 
-                        y = torch.repeat_interleave(y, c.n_sig_MC*c.n_noise_MC, dim=0)
-                        sig = torch.repeat_interleave(sig, c.n_noise_MC, dim=0)
-                    y = torch.clip( y * (1+ (10**(sig))*torch.randn(y.shape[0], y.shape[1]) ), min=ymin.reshape(-1,1) ) # all line independent
-                    
-                    # Transform to rescaled: np array again
-                    x = torch.Tensor(data.params_to_x(x))
-                    y = torch.hstack((torch.Tensor(data.obs_to_y(y)), torch.Tensor(data.unc_to_sig(10**sig))))
                 
                 x, y = x.to(c.device), y.to(c.device)
 
@@ -678,27 +662,13 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                 # Domain Adaptaion
                 # 이미 torch로 있다고 가정. 리스케일까지 되어서, y_real
                 if c.domain_adaptation:
-                    # if using presnoise and expansion: expand as well
-                    if c.prenoise_training:
-                        y_real = data_real
-                        s_real = err_real
-                        if c.n_sig_MC*c.n_noise_MC > 1:
-                            y_real = torch.repeat_interleave(y_real, c.n_sig_MC*c.n_noise_MC, dim=0) 
-                            s_real = torch.repeat_interleave(s_real, c.n_sig_MC*c.n_noise_MC, dim=0) 
-                        y_real = torch.hstack((torch.Tensor(data.obs_to_y(y_real)), torch.Tensor(data.unc_to_sig(s_real)))).to(c.device)
-                    else:
-                        y_real = data_real.to(c.device) 
+                    y_real = data_real.to(c.device) 
                         
     
                     with torch.no_grad():
                         features_real = model.cond_net.features(y_real)
                         D_real = model.da_disc.forward(features_real)
                         D_fake = model.da_disc.forward(features)
-                        
-                        # # checking
-                        # if i_batch==0:
-                        #     mmd_val = compute_mmd_rbf(features, features_real, sigma=1.0)
-                        #     print(f"MMD: {mmd_val.item():.6g}")
                             
                     if cal_disc:
                         if c.da_mode=='simple':
@@ -902,7 +872,7 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                        
             # Checkpoint
             if c.checkpoint_save:
-                if (i_epoch % c.checkpoint_save_interval) == 0:
+                if (i_epoch % c.checkpoint_save_interval) == 0 and i_epoch > 0:
                     if c.checkpoint_save_overwrite:
                         checkpoint_filename = c.filename + '_checkpoint'
                     else:
@@ -952,6 +922,10 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                     if verbose:
                         print("Either train or test curve diverged at: %d"%i_epoch)
                     training_status = -1 # -1 = diverged
+                    
+            print(f"[Epoch {i_epoch}] Time: {time() - epoch_start:.2f}s")
+            gc.collect()
+            torch.cuda.empty_cache()
         
         #%% End of all epochs 
         ### END LOOP    

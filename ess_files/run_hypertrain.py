@@ -282,7 +282,7 @@ def train_network(config, logfile=None):
         # args = ['python','ess_files/run_train.py', config.config_file, config.device]
         # if 'cuda' in config.device:
         #     if not check_device(int(config.device.replace('cuda:',''))):
-    args = ['python','-u','ess_files/run_train.py', config.config_file, '--log', 'False']
+    args = ['python','-u','ess_files/run_train.py', config.config_file, '-r', '--log', 'False']
     proc = subprocess.Popen(args,
                             stdout=f_train_log, stderr=f_train_log, start_new_session=True).wait()
     

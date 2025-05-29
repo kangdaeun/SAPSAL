@@ -288,7 +288,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     #%% 1) Latent tests
     if run_forward:
         c.load_network_model()
-        
+        # for z tests, keep similar to training situation: raundom sigma, smoothing 
         z_all = tools.calculate_z(c.network_model, astro, smoothing=c.train_smoothing)
         tools.plot_z(z_all, figname=figurename_dic['z_cov'], corrlabel=True, title=network_name,
                      legend=True, covariance=True, cmap=cm.get_cmap("gnuplot"), color_letter='r', return_figure=False)#, yrange1=[-0.04, 0.6], yrange2=[-0.1, 0.2])
@@ -354,14 +354,10 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                  'use_percentile': None,
                  'plot':False }
     
-    # result 
-    # hist_dic = {} # save histogram info of True vs All
-    # map_hist_dic = {}
-    # map_list = [] 
+
         
-        
-    # eval_calib:
     
+    # Calibration setting
     # how many different confidences to look at
     n_steps = 100
     q_values = []
@@ -390,24 +386,23 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             sum_dev_x = 0
     
         for i_group in range(n_group):
-        # for i_group in range(10):
             obs_group = obs_test[i_group*GROUP_SIZE:(i_group+1)*GROUP_SIZE]
             param_group = param_test[i_group*GROUP_SIZE:(i_group+1)*GROUP_SIZE]
             
-            # prenoise : use middle error
+            # prenoise : use middle value for p(sigma). one sigma for all y components
             if c.prenoise_training==True:
+                # if c.unc_corrl == 'Ind_Man' or c.unc_corrl == 'Ind_Unif' or c.unc_corrl == 'Single' :
+                if lsig_fix is not None: # for requested lsig
+                    lsig_mid = lsig_fix
+                else:
+                    # Currently not supported for Seg_Flux option
+                    if c.unc_sampling == 'gaussian':
+                        lsig_mid = c.lsig_mean
+                    elif c.unc_sampling == 'uniform':
+                        lsig_mid = 0.5*(c.lsig_min + c.lsig_max)
                 
-                if c.unc_corrl == 'Ind_Man' or c.unc_corrl == 'Ind_Unif' or c.unc_corrl == 'Single':
-                    if lsig_fix is not None: # for requestes lsig
-                        lsig_mid = lsig_fix
-                    else:
-                        if c.unc_sampling == 'gaussian':
-                            lsig_mid = c.lsig_mean
-                        elif c.unc_sampling == 'uniform':
-                            lsig_mid = 0.5*(c.lsig_min + c.lsig_max)
-                    
-                    if c.unc_corrl == 'Ind_Unif' or c.unc_corrl == 'Single':
-                        lsig_mid = np.repeat(lsig_mid, obs_group.shape[1]) # const -> 1D array
+                if np.ndim(lsig_mid)==0: # one value
+                    lsig_mid = np.repeat(lsig_mid, obs_group.shape[1]) # const -> 1D array
                 
                 # same error for all observations
                 unc_group = 10**np.repeat([lsig_mid], obs_group.shape[0], axis=0)
@@ -626,117 +621,6 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                        discretized_parameters=discretized_parameters, plotting_map=False, title=network_name,
                        figname=figurename_dic['TvP'], return_figure=False)
         
-    
-        # """
-        # Calculate confusion matrix for discretized parameters (All)
-        # """
-        # conf_matrix = {}
-    
-        # for param in discretized_parameters:
-        #     if param in astro.x_names:
-        #         H, xedges, yedges = hist_dic[param]['H'].copy(), hist_dic[param]['xedges'], hist_dic[param]['yedges']
-        #         H = H.transpose()
-        #         conf = H.copy()*0.0
-    
-        #         for i in range(H.shape[1]):
-        #             conf[:,i] = H[:,i]/np.sum(H[:,i])*100
-    
-        #         conf_matrix[param] = conf
-    
-        # """
-        # All posterior estimates plot
-        # """   
-    
-        # H_min = 10 # 보통
-        # if len(obs_test) < 1e4:
-        #     H_min = 5
-        # # set figure size and grid
-    
-        # # nrow는 4의 배수로 끊김 ~4:1, ~8:2, ~12:3
-        # nrow = np.ceil(len(c.x_names)/4).astype(int)
-        # ncol = np.ceil(len(c.x_names)/nrow).astype(int)
-        # # figsize = [3.1*ncol, 4*nrow]
-        # figsize = [3.3*ncol, 3.8*nrow]
-        # fig, axis = plt.subplots(nrow, ncol, figsize=figsize)
-        # axis = axis.ravel()
-    
-    
-    
-        # for i_param, param in enumerate(c.x_names):
-        #     ax = axis[i_param]
-    
-        #     H, xedges, yedges = hist_dic[param]['H'].copy(), hist_dic[param]['xedges'], hist_dic[param]['yedges']
-    
-        #     roi = H < H_min
-        #     Hsum = np.nansum(H)
-        #     H[roi] = np.nan
-        #     H = H/Hsum
-    
-        #     # cmap = copy.copy(cm.gnuplot2_r)
-        #     cmap = copy.copy(cm.Oranges)
-        #     # cmap = copy.copy(cm.gnuplot)
-        #     # cmap.set_bad("grey", 0.2)
-    
-        #     ims=ax.imshow( H.transpose(), origin='lower', extent = (xedges[0], xedges[-1], yedges[0], yedges[-1]), 
-        #                   aspect='auto',
-        #              cmap=cmap)#, norm=clr.LogNorm())
-            
-        #     axins = ax.inset_axes( [0.07, 0.89, 0.5, 0.03 ])
-        #     cbar=fig.colorbar(ims, cax=axins, orientation="horizontal")
-        #     cbar.minorticks_off()
-        #     axins.tick_params(axis='both',which='both',labelsize='medium', direction='out', length=2)
-        #     axins.set_title('Fraction', size='medium')
-        #     # axins.xaxis.set_major_locator(ticker.LogLocator(numticks=3))
-        #     axins.xaxis.set_major_locator(ticker.MaxNLocator(3))
-    
-        #     if param in conf_matrix.keys():
-        #         conf = conf_matrix[param]
-    
-        #         xp = 0.5*(xedges[1:]+xedges[:-1])
-        #         yp = 0.5*(yedges[1:]+yedges[:-1])
-    
-        #         for ix, x in enumerate(xp):
-        #             for iy, y in enumerate(yp):
-        #                 if np.isfinite(H[ix,iy]):
-        #                     string = '%.2g'%(conf[iy,ix])
-        #                     if (conf[iy,ix] < 1): string = '%.1f'%(conf[iy,ix])
-        #                     if conf[iy,ix] >= 99.5: string = '100'
-        #                     ax.text(x, y, string,  color='k', fontsize=8.5, ha='center', va='center', path_effects=[PathEffects.withStroke(linewidth=2, foreground='w')] )
-           
-    
-        #     # 1:1 
-        #     xr = ax.get_xlim()
-        #     yr = ax.get_ylim()
-        #     mini = np.min(xr+yr); maxi = np.max(xr+yr)
-        #     xx=np.linspace(mini, maxi, 500)
-        #     ax.plot(xx,xx,'-',color='navy', lw=0.7)
-        #     ax.set_xlim(xr); ax.set_ylim(yr)
-            
-        #     # special tick in the case of SpTind
-        #     if param == 'SpTind':
-        #         # for M0, K0, G0, etc
-        #         major_ticklabels = [f"{a}0" for a in ['O', 'B', 'A', 'F', 'G', 'K', 'M']]
-        #         major_ticks = [ astro.exp.convert_spt_to_num(spt) for spt in major_ticklabels ]
-        #         minor_ticks = np.arange(major_ticks[0], major_ticks[-1]+9.5, 1)
-                
-        #         ax.xaxis.set_minor_locator(ticker.FixedLocator(minor_ticks))
-        #         ax.yaxis.set_minor_locator(ticker.FixedLocator(minor_ticks))
-        #         ax.set_xticks(major_ticks, labels=major_ticklabels)
-        #         ax.set_yticks(major_ticks, labels=major_ticklabels)
-            
-        #         ax.set_xlim(xr); ax.set_ylim(yr)
-            
-        #     ax.text(0.95, 0.05, 'RMSE = %.4g\n'%(rmse_table[param][rmse_table['type']=='RMSE_ALL_PARAM'][0])+r'N$_{\mathrm{test}}$ = %d'%(N_test),  
-        #             transform=ax.transAxes, ha='right', va='bottom', fontsize=9,
-        #              bbox=dict(boxstyle='square', facecolor='w', alpha=1, edgecolor='silver') )
-    
-        #     ax.set(title=param, xlabel=r'$X^{\mathrm{True}}$', ylabel=r"$X^{\mathrm{Post}}$")
-    
-        # for j in range(i_param+1, len(axis)):
-        #     axis[j].axis("off")
-            
-        # fig.tight_layout()
-        # fig.savefig(figurename_dic['TvP'])
         if VERBOSE:
             print("Saved TvP figure")
         
@@ -745,124 +629,12 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                        discretized_parameters=discretized_parameters, plotting_map=True, title=network_name,
                        figname=figurename_dic['TvP_MAP'], return_figure=False)
         
-        # """
-        # Calculate confusion matrix for discretized parameters (MAP)
-        # """
-        # conf_matrix = {}
-    
-        # for param in discretized_parameters:
-        #     if param in astro.x_names:
-        #         H, xedges, yedges = map_hist_dic[param]['H'].copy(), map_hist_dic[param]['xedges'], map_hist_dic[param]['yedges']
-        #         H = H.transpose()
-        #         conf = H.copy()*0.0
-    
-        #         for i in range(H.shape[1]):
-        #             conf[:,i] = H[:,i]/np.sum(H[:,i])*100
-    
-        #         conf_matrix[param] = conf
-    
-        # """
-        # MAP posterior estimates plot
-        # """
-        # H_min = 5 # 보통
-        # if len(obs_test) < 1e4:
-        #     H_min = 1
-        # # set figure size and grid
-    
-        # # nrow는 4의 배수로 끊김 ~4:1, ~8:2, ~12:3
-        # nrow = np.ceil(len(c.x_names)/4).astype(int)
-        # ncol = np.ceil(len(c.x_names)/nrow).astype(int)
-        # # figsize = [3.1*ncol, 4*nrow]
-        # figsize = [3.3*ncol, 3.8*nrow]
-        # fig, axis = plt.subplots(nrow, ncol, figsize=figsize)
-        # axis = axis.ravel()
-    
-    
-        # for i_param, param in enumerate(c.x_names):
-        #     ax = axis[i_param]
-    
-        #     H, xedges, yedges = map_hist_dic[param]['H'].copy(), map_hist_dic[param]['xedges'], map_hist_dic[param]['yedges']
-    
-        #     roi = H < H_min
-        #     Hsum = np.nansum(H)
-        #     H[roi] = np.nan
-        #     H = H/Hsum
-    
-        #     cmap = copy.copy(cm.Oranges)
-        #     # cmap = copy.copy(cm.gnuplo t2_r)
-        #     # cmap = copy.copy(cm.gnuplot)
-        #     # cmap.set_bad("grey", 0.2)
-    
-        #     ims=ax.imshow( H.transpose(), origin='lower', extent = (xedges[0], xedges[-1], yedges[0], yedges[-1]), 
-        #                   aspect='auto',
-        #              cmap=cmap)#, norm=clr.LogNorm())
-    
-        #     axins = ax.inset_axes( [0.07, 0.89, 0.5, 0.03 ])
-        #     cbar=fig.colorbar(ims, cax=axins, orientation="horizontal")
-        #     cbar.minorticks_off()
-        #     axins.tick_params(axis='both',which='both',labelsize='medium', direction='out', length=2)
-        #     axins.set_title('Fraction', size='medium')
-        #     # axins.xaxis.set_major_locator(ticker.LogLocator(numticks=3))
-        #     axins.xaxis.set_major_locator(ticker.MaxNLocator(3))
-    
-        #     if param in conf_matrix.keys():
-        #         conf = conf_matrix[param]
-    
-        #         xp = 0.5*(xedges[1:]+xedges[:-1])
-        #         yp = 0.5*(yedges[1:]+yedges[:-1])
-    
-        #         for ix, x in enumerate(xp):
-        #             for iy, y in enumerate(yp):
-        #                 if np.isfinite(H[ix,iy]):
-        #                     string = '%.2g'%(conf[iy,ix])
-        #                     if (conf[iy,ix] < 1): string = '%.1f'%(conf[iy,ix])
-        #                     if conf[iy,ix] >= 99.5: string = '100'
-        #                     ax.text(x, y, string,  color='k', fontsize=8.5, ha='center', va='center', path_effects=[PathEffects.withStroke(linewidth=2, foreground='w')] )
-    
-        #     # 1:1 
-        #     xr = ax.get_xlim()
-        #     yr = ax.get_ylim()
-        #     mini = np.min(xr+yr); maxi = np.max(xr+yr)
-        #     xx=np.linspace(mini, maxi, 500)
-        #     ax.plot(xx,xx,'-',color='navy', lw=0.7)
-        #     ax.set_xlim(xr); ax.set_ylim(yr)
-            
-        #     # special tick in the case of SpTind
-        #     if param == 'SpTind':
-        #         # for M0, K0, G0, etc
-        #         major_ticklabels = [f"{a}0" for a in ['O', 'B', 'A', 'F', 'G', 'K', 'M']]
-        #         major_ticks = [ astro.exp.convert_spt_to_num(spt) for spt in major_ticklabels ]
-        #         minor_ticks = np.arange(major_ticks[0], major_ticks[-1]+9.5, 1)
-                
-        #         ax.xaxis.set_minor_locator(ticker.FixedLocator(minor_ticks))
-        #         ax.yaxis.set_minor_locator(ticker.FixedLocator(minor_ticks))
-        #         ax.set_xticks(major_ticks, labels=major_ticklabels)
-        #         ax.set_yticks(major_ticks, labels=major_ticklabels)
-            
-        #         ax.set_xlim(xr); ax.set_ylim(yr)
-    
-        #     ax.text(0.95, 0.05, 'RMSE = %.4g\n'%(rmse_table[param][rmse_table['type']=='RMSE_MAP_PARAM'][0])+r'N$_{\mathrm{test}}$ = %d'%(N_test),  
-        #             transform=ax.transAxes, ha='right', va='bottom', fontsize=9,
-        #              bbox=dict(boxstyle='square', facecolor='w', alpha=1, edgecolor='silver') )
-            
-        #     ax.set(title=param, xlabel=r'$X^{\mathrm{True}}$', ylabel=r"$X^{\mathrm{MAP}}$")
-    
-        # for j in range(i_param+1, len(axis)):
-        #     axis[j].axis("off")
-    
-        # fig.tight_layout()
-        # fig.savefig(figurename_dic['TvP_MAP'])
         if VERBOSE:
             print("Saved TvP MAP figure")
         
     
     #%% plot calibration
     if eval_calib:
-        
-#         if not os.path.exists(filename_dic['calib']):
-#             ascii.write(calib_table, filename_dic['calib'], delimiter='\t', format='commented_header')
-#             print("Saved calib data file")
-        
         tools.plot_calibration(calib_table, title=network_name, figname=figurename_dic['calib'], return_figure=False)
         
         if VERBOSE:
@@ -881,7 +653,7 @@ if __name__=='__main__':
     parser.add_argument('config_file', help="Run with specified config file as basis.")
     parser.add_argument('-d','--device', required=False, default=None, help="device for network")
     parser.add_argument('-l','--lsig', required=False, default=None, help="Const log (sigma) for Noise-Net evaluation. If this is set, the filenames change.")
-    # parser.add_argument('-g','--group', required=False, default=None, help="GroupSize(defulat set 200)")
+    parser.add_argument('-g', '--group_size', type=int, default=GROUP_SIZE, help="# of obs per one posterior processing (Default=400)")
     parser.add_argument('-L','--log', required=False, default=True, help="Save logfile T/F")
     
     args = parser.parse_args()
@@ -892,6 +664,8 @@ if __name__=='__main__':
         savelog = False
     else:
         savelog = True
+    
+    GROUP_SIZE = args.group_size
         
     # if savelog:
     #     logfile = os.path.basename(args.config_file).replace('.py','_evaluation.log').replace('c_','')

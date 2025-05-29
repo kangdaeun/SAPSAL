@@ -10,14 +10,15 @@ from cINN_set.execute import train_network #test
 from cINN_set.tools.logger import Logger
 
 from argparse import ArgumentParser
+from time import time
 
 # # from cINN.test_execute import train_network
 
-GPU_MAX_LOAD = 0.7          # Maximum compute load of GPU allowed in automated selection
-GPU_MAX_MEMORY = 0.7         # Maximum memory load of GPU allowed in automated selection
+GPU_MAX_LOAD = 0.5          # Maximum compute load of GPU allowed in automated selection
+GPU_MAX_MEMORY = 0.5         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
-GPU_EXCLUDE_IDS = [1,2,] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
+GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
 VERBOSE = True
 MAX_EPOCH = 500 #1000
 
@@ -46,8 +47,7 @@ if __name__ == '__main__':
         MAX_EPOCH = int(args.max_epoch)
         
     resume = args.resume
-        
-        
+    
         
     # if savelog:
     #     logfile = os.path.basename(args.config_file).replace('.py','_train.log').replace('c_','')
@@ -81,8 +81,12 @@ if __name__ == '__main__':
         # sys.stdout = Logger(logfile, log_mode=LOG_MODE, mode="a") # continue logging
         logger = Logger(logfile, log_mode=LOG_MODE, mode="a")
         
-    
+    if os.environ.get("CUDA_LAUNCH_BLOCKING")==1: # This is only for debugging. do not use   
+        print("CUDA_LAUNCH_BLOCKING =", os.environ.get("CUDA_LAUNCH_BLOCKING"))
+        
+    data_loading_start=time()
     astro = DataLoader(c, update_rescale_parameters=True)
+    print(f"[Time for data loading: {time() - data_loading_start:.2f}s]")
     
     # if len(sys.argv)==3:
     if args.device is not None:

@@ -154,16 +154,17 @@ def cardelli_extinction(wave, Av, Rv):
     npts = len(x)
     a = np.zeros(npts)
     b = np.zeros(npts)
+    # extinction valid range: upto 3.3333 um, down to 3030A
     #******************************
 
-    good = (x > 0.3) & (x < 1.1) #Infrared
+    good = (x > 0.3) & (x < 1.1) #Infrared: 9090.90 A ~ 3.3333um
     Ngood = np.count_nonzero(good == True)
     if Ngood > 0:
-        a[good] = 0.574 * x[good]**(1.61)
+        a[good] = 0.574 * x[good]**(1.61) # from Cardelli+1989
         b[good] = -0.527 * x[good]**(1.61)
 
-    #******************************
-    good = (x >= 1.1) & (x < 3.3) #Optical/NIR
+    #****************************** 
+    good = (x >= 1.1) & (x < 3.3) #Optical/NIR: 3030.30A ~ 9090.90A
     Ngood = np.count_nonzero(good == True)
     if Ngood > 0: #Use new constants from O'Donnell (1994)
         y = x[good] - 1.82
@@ -178,6 +179,8 @@ def cardelli_extinction(wave, Av, Rv):
     ratio = 10.**(-0.4*A_lambda)
 
     return ratio # dim(ratio) = dim(wave)
+
+    
 
 
 

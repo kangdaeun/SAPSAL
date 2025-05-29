@@ -153,11 +153,6 @@ def calculate_z(model, astro, smoothing=True):
         zT, _ = model.model(xT, features, rev=False)
 #        if astro.FrEIA_ver == 0.1:
 #            zT = model.model(xT, features, rev=False)
-#        elif astro.FrEIA_ver == 0.2:
-#            zT, _ = model.model(xT, features, rev=False)
-#        else:
-#            zT = model.model(xT, features, rev=False)
-
     z_all = zT.data.cpu().numpy()
     
     return z_all
@@ -280,7 +275,7 @@ def plot_z(z_all, figname=None, corrlabel=True, legend=True, yrange1=None, yrang
         else:
             label='str(i)'
             res_ax.step(xp, resi, where='mid',label=label, color=line_color[i], lw=0.8)
-
+    res_ax.axhline(y=0, zorder=0, color='grey', lw=0.5, ls='--')
     res_ax.set_xlim(ax.get_xlim())
     if yrange2 is not None:
         res_ax.set_ylim(yrange2)
@@ -484,13 +479,8 @@ def plot_calibration(calib_table, figname=None, return_figure=False, title=None,
 
         ax.plot(xval, yval)
         ax.axhline(y=0,ls='--', color='k', lw=0.5)
-        # l1=ax.axhline(y=np.median(yval), label='Med: {:.3g}%'.format(np.median(yval)*100), ls='--', color='r', lw=1)
-        # ax.legend(handles=[l1], fontsize='medium', loc='lower left')
-        # l1=ax.axhline(y=np.median(yval), label='Median', ls='--', color='r', lw=1)
 
         ax.tick_params(labelsize='small', labelbottom=False)
-        # if i==0:
-        #     ax.legend(handles=[l1], fontsize='medium')
         ax.set_title(param, size='large')
 
         txt = [ ]

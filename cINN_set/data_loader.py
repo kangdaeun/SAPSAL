@@ -31,6 +31,7 @@ import numpy as np
 import torch # get loader
 import torch.utils.data
 import sys #, os
+import multiprocessing
 # import importlib.util
 
 from .cINN_config import cINNConfig
@@ -77,6 +78,19 @@ def whitening_matrix(X,fudge=1e-7):
 
 def stddev_matrix(X):
     return np.diag(1./np.std(X, axis=0))#.astype(np.float32) # 이쪽은 불필요하긴한데
+
+
+def get_num_workers():
+    try:
+        if torch.backends.mps.is_available():
+            return 0
+        if torch.cuda.is_available():
+            num_cpu = multiprocessing.cpu_count()
+            return min(16, max(1, num_cpu // 4))  # GPU 사용 시 최적화
+        # CPU-only 환경에서는 0
+        return 0
+    except:
+        return 0
 
 
 
@@ -345,8 +359,6 @@ class DataLoader(cINNConfig):
         rawval = False
         if self.prenoise_training==True:
             rawval = True
-        # elif self.train_noisy_obs == True: # deprecated
-        #     rawval = True
             
         # always follow config setting
         veil_flux = False
@@ -371,18 +383,41 @@ class DataLoader(cINNConfig):
         all_x = all_x[perm]
         all_y = all_y[perm]
         
+        
+        # Data augmentation for prenoise training and then rescale
+        if self.prenoise_training==True:
+            ymin = np.min(np.abs(all_y), axis=1) # minimum value for each 
+            # unc_corrl, unc_sampling etc are considerd 
+            if self.unc_corrl=='Seg_Flux':
+                flux = all_y[:, self.exp.get_spec_index(self.y_names)]
+            else: 
+                flux=None
+            sig = self.create_uncertainty(all_y.shape, flux=flux)  # now expand, n_sig_MC, c.n_noise_MC are deprecated
+            # if c.n_sig_MC*c.n_noise_MC > 1:
+            #     # N_mc expansion (n_noise_MC) + noise sampling (all line independent)
+            #     x = torch.repeat_interleave(x, c.n_sig_MC*c.n_noise_MC, dim=0) 
+            #     y = torch.repeat_interleave(y, c.n_sig_MC*c.n_noise_MC, dim=0)
+            #     sig = torch.repeat_interleave(sig, c.n_noise_MC, dim=0)
+            all_y = np.clip( all_y * (1+ (10**(sig))*np.random.randn(*all_y.shape)), a_min=ymin.reshape(-1,1), a_max=None ) # all line independent
+            
+            # Transform to rescaled: np array again
+            all_x = self.params_to_x(all_x)
+            all_y = np.hstack( (self.obs_to_y(all_y), self.unc_to_sig(10**sig) ) )
+        
+        #-----------------------------------
         all_x = torch.Tensor(all_x)
         all_y = torch.Tensor(all_y)
         
         torch.manual_seed(seed)
         
+        pin_memory = torch.cuda.is_available()
         test_loader = torch.utils.data.DataLoader(
                 torch.utils.data.TensorDataset(all_x[:test_split], all_y[:test_split]),
-                batch_size=batch_size, shuffle=True, drop_last=True)
+                batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory, num_workers=get_num_workers())
              
         train_loader = torch.utils.data.DataLoader(
             torch.utils.data.TensorDataset(all_x[test_split:], all_y[test_split:]),
-            batch_size=batch_size, shuffle=True, drop_last=True)
+            batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory,  num_workers=get_num_workers())
         
         
         
