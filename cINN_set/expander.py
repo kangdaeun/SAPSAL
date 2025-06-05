@@ -20,67 +20,111 @@ def read_database(tablename):
     # whole_table = ascii.read( tablename, delimiter="\t", format="commented_header")    
     return whole_table
 
-def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic=None, f_max_dic=None):
-    
-    # table_cols = table.columns.values.tolist()
 
-    if random_parameters is None:
-        params = table.loc[:, x_names].values # if all x_names in table already, just read
-        spec = table.loc[:, y_names].values
-        
-    else:
-        rparams = list(random_parameters.keys())
-        xn_in_rp = [k for k in x_names if k in rparams ]
-        yn_in_rp = [k for k in y_names if k in rparams ]
-        
-        xn_nin_rp = [k for k in x_names if k not in rparams ]
-        yn_nin_rp = [k for k in y_names if k not in rparams ]
-        
-        params = table.loc[:, xn_nin_rp]
-        spec = table.loc[:, yn_nin_rp]
-        
-        np.random.seed(int(random_seed))
-        
-        if len(xn_in_rp)>0:
-            for param in xn_in_rp:
-                mini, maxi = random_parameters[param]
-                f_min, f_max = 0., 0.
-                try: 
-                    f_min = f_min_dic[param]
-                except: 
-                    pass
-                try:
-                    f_max = f_max_dic[param]
-                except:
-                    pass
-                
-                ii = x_names.index(param)
-                rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
-                                                               f_min=f_min, f_max=f_max)
-                params.insert(ii, param, rval)
-                
-        if len(yn_in_rp)>0:
-            for param in yn_in_rp:
-                mini, maxi = random_parameters[param]
-                f_min, f_max = 0., 0.
-                try:
-                    f_min = f_min_dic[param]
-                except:
-                    pass
-                try:
-                    f_max = f_max_dic[param]
-                except:
-                    pass
-                
-                ii = y_names.index(param)
-                rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
-                                                               f_min=f_min, f_max=f_max)
-                spec.insert(ii, param, rval)
-                
-        params = params.values
-        spec = spec.values
+def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic={}, f_max_dic={}):
+    
+    np.random.seed(int(random_seed))
+    N = len(table)
+    table_cols = set(table.columns)
+
+    rparams = set(random_parameters.keys()) if random_parameters else set()
+
+    # 전체 param/spec을 NaN으로 초기화
+    params = np.full((N, len(x_names)), np.nan)#, dtype=np.float32)
+    spec = np.full((N, len(y_names)), np.nan)#, dtype=np.float32)
+
+    # === X 처리 ===
+    for i, param in enumerate(x_names):
+        if param in rparams:  # 1순위: 랜덤 파라미터
+            mini, maxi = random_parameters[param]
+            f_min = f_min_dic.get(param, 0.) # 0 if f_min is not specified for this parameter
+            f_max = f_max_dic.get(param, 0.)
+            params[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max)
+        elif param in table_cols:  # 2순위: 테이블에서 가져오기
+            params[:, i] = table[param].values
+        # else: 그대로 nan
+
+    # === Y 처리 ===
+    for i, param in enumerate(y_names):
+        if param in rparams:
+            mini, maxi = random_parameters[param]
+            f_min = f_min_dic.get(param, 0.)
+            f_max = f_max_dic.get(param, 0.)
+            spec[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max)
+        elif param in table_cols:
+            spec[:, i] = table[param].values
+        # else: 그대로 nan
 
     return (params, spec)
+
+
+# def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic=None, f_max_dic=None,
+#               exclude = []):
+    
+#     table_cols = table.columns.values.tolist()
+#     # N_data = len(table)
+#     # params = np.zeros( (N_data, len(x_names)) ) + np.nan
+#     # spec = np.zeros( (N_data, len(y_names))) + np.nan
+    
+#     # all_in_table = set(x_names + y_names).issubset(table_cols) # all x_names and y_naems are in table
+
+#     if random_parameters is None:
+#         params = table.loc[:, x_names].values # if all x_names in table already, just read
+#         spec = table.loc[:, y_names].values
+        
+#     else:
+#         rparams = list(random_parameters.keys())
+#         xn_in_rp = [k for k in x_names if k in rparams ]
+#         yn_in_rp = [k for k in y_names if k in rparams ]
+        
+#         xn_nin_rp = [k for k in x_names if k not in rparams ]
+#         yn_nin_rp = [k for k in y_names if k not in rparams ]
+        
+#         params = table.loc[:, xn_nin_rp]
+#         spec = table.loc[:, yn_nin_rp]
+        
+#         np.random.seed(int(random_seed))
+        
+#         if len(xn_in_rp)>0:
+#             for param in xn_in_rp:
+#                 mini, maxi = random_parameters[param]
+#                 f_min, f_max = 0., 0.
+#                 try: 
+#                     f_min = f_min_dic[param]
+#                 except: 
+#                     pass
+#                 try:
+#                     f_max = f_max_dic[param]
+#                 except:
+#                     pass
+                
+#                 ii = x_names.index(param)
+#                 rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
+#                                                                f_min=f_min, f_max=f_max)
+#                 params.insert(ii, param, rval)
+                
+#         if len(yn_in_rp)>0:
+#             for param in yn_in_rp:
+#                 mini, maxi = random_parameters[param]
+#                 f_min, f_max = 0., 0.
+#                 try:
+#                     f_min = f_min_dic[param]
+#                 except:
+#                     pass
+#                 try:
+#                     f_max = f_max_dic[param]
+#                 except:
+#                     pass
+                
+#                 ii = y_names.index(param)
+#                 rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
+#                                                                f_min=f_min, f_max=f_max)
+#                 spec.insert(ii, param, rval)
+                
+#         params = params.values
+#         spec = spec.values
+
+#     return (params, spec)
 
 
 def normalize_flux(obs_data, normalize_total_flux=None, normalize_mean_flux=None, normalize_f750=None, wl=None,):
@@ -89,7 +133,7 @@ def normalize_flux(obs_data, normalize_total_flux=None, normalize_mean_flux=None
     elif normalize_mean_flux:
         return obs_data/np.mean(obs_data, axis=1).reshape(-1,1)
     elif normalize_f750:
-        f750_array = get_dominika_f750_2d(wl, obs_data)
+        f750_array = get_f750(wl, obs_data)
         return obs_data / f750_array.reshape(-1,1)
     else:
         return obs_data
@@ -129,18 +173,16 @@ def generate_random_parameter(N_data, min_value = None, max_value = None,
 
     return values
 
-def get_spec_index(y_names, get_name=False):
+def get_spec_index(y_names, get_loc=False):
     # filter out indices for spectral bins : l2, l231, from y_names:
+    # not the index in y_names, it changes 'l0' -> 0
         
     # [s for s in c.y_names if s.startswith('l') and s[1:].isdigit()][-1]
-    indices = np.array([i for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()])
-    names = np.array([s for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()])
     
-    
-    if get_name:
-        return names
+    if get_loc:
+        return np.array([i for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()])
     else:
-        return indices
+        return np.array([int(s[1:]) for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()]) 
 
 def cardelli_extinction(wave, Av, Rv):
     # If you use it to apply a reddening to a spectrum, multiply it for the result of
@@ -220,48 +262,91 @@ def extinct_spectrum(wl, flux, Av_array, Rv_array):
 
 
 
-def get_dominika_f750(wl, fl):
-    id750 = np.abs(wl - 7500.).argmin()
-    f750 = np.nanmedian(fl[id750 - 3:id750 + 3]) # this is value
-    return f750
+def get_f750(wl, fl):
+    """
+    wl: 1D array. apply to all obs
+    fl: 1D array (one spec) or  2D array (N_obs)
 
-def get_dominika_f750_2d(wl, fl): # 1D wavelength value, and 2D flux valu
-    # assume that flux is in 2D array (N_data, spec) and all have the same spectral bins
+    """
     id750 = np.abs(wl - 7500.).argmin()
-    f750_2d = np.nanmedian(fl[:, id750 - 3:id750 + 3], axis=1) # this is 1D array
-    return f750_2d
+
+    if fl.ndim == 1:
+        return np.nanmedian(fl[id750 - 3:id750 + 3]) 
+
+    elif fl.ndim == 2:
+        sub_fl = fl[:, id750 - 3:id750 + 3]  # shape (N, 6)
+        sorted_sub = np.sort(sub_fl, axis=1)
+        median_vals = 0.5 * (sorted_sub[:, 2] + sorted_sub[:, 3])
+        return median_vals
+
+    else:
+        raise ValueError("fl must be 1D or 2D numpy array")
+
+
+
+# def get_dominika_f750(wl, fl):
+#     id750 = np.abs(wl - 7500.).argmin()
+#     f750 = np.nanmedian(fl[id750 - 3:id750 + 3]) # this is value
+#     return f750
+
+# def get_dominika_f750_2d(wl, fl): # 1D wavelength value, and 2D flux valu
+#     """
+#     wl: 1D wavelengh, applyt to all 
+#     fl: 2D flux value: N_obs x N_spectral bins
+#     """
+#     # assume that flux is in 2D array (N_data, spec) and all have the same spectral bins
+#     id750 = np.abs(wl - 7500.).argmin()
+#     f750_2d = np.nanmedian(fl[:, id750 - 3:id750 + 3], axis=1) # this is 1D array
+#     return f750_2d
+
+# def get_dominika_f750_2d(wl, fl):
+#     id750 = np.abs(wl - 7500.).argmin()
+#     sub_fl = fl[:, id750 - 3:id750 + 3]  # shape: (N, 6)
+
+#     # sort along last axis (axis=1)
+#     sorted_sub = np.sort(sub_fl, axis=1)
+
+#     # 직접 nan 처리 없이 중간값 추출: 중앙 두 값의 평균
+#     # (6개 값 중 중간 두 개가 2번째와 3번째 값이므로)
+#     median_2d = 0.5 * (sorted_sub[:, 2] + sorted_sub[:, 3])
+#     return median_2d
  
 
 # Veiling   
 def add_veil(wl, fl, veil):
    
+    f750 = get_f750(wl, fl)
     # for only one spectrum
-    if len(fl.shape)==1:
-        f750 = get_dominika_f750(wl, fl)
+    if fl.ndim == 1:
         fl = fl + veil*f750
-        
-    # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
-    elif len(fl.shape)==2: 
-        f750 = get_dominika_f750_2d(wl, fl)
+    elif fl.ndim == 2: # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
         if len(veil)==fl.shape[0]:
             fl = fl + (veil * f750).reshape(-1,1)
+        else:
+            ValueError("len(veil)!=N_obs")
+    else:
+        raise ValueError("fl must be 1D or 2D numpy array")
         
     return fl
 
 # HSlab veiling 
 def add_slab_veil(wl, fl, veil, fslab_750):
+    f750 = get_f750(wl, fl)
     # for only one spectrum
-    if len(fl.shape)==1:
-        f750 = get_dominika_f750(wl, fl)
+    if fl.ndim == 1:
         fl = fl + veil * fslab_750 * f750
-    # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
-    elif len(fl.shape)==2:
-        f750 = get_dominika_f750_2d(wl, fl)
+    
+    elif fl.ndim == 2: # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
         # one slab or different slabs
-        if len(fslab_750.shape)==1: # one slab for all spec -> make 2D array
-            fslab_750 = np.repeat(fslab_750.reshape(1,-1), fl.shape[0], axis=0)
+        # if fslab_750.ndim==1: # one slab for all spec -> make 2D array
+        #     fslab_750 = np.repeat(fslab_750.reshape(1,-1), fl.shape[0], axis=0)
         if len(veil)==fl.shape[0]:
-            fl = fl + ((veil * f750).reshape(-1,1) )*fslab_750
+            # fl = fl + ((veil * f750).reshape(-1,1) )*fslab_750
+            fl = fl + (veil * f750)[:, None] * fslab_750
+        else:
+            ValueError("len(veil)!=N_obs")
+    else:
+        raise ValueError("fl must be 1D or 2D numpy array")
     return fl
 
 # read already saved one slab
@@ -277,6 +362,43 @@ def read_example_slab():
     # filepath = "./Slab_T7_N13_t1_n750.txt" # normalized at 7500A
     # np.loadtxt(filepath)
     return float_array
+
+
+def assign_slab_grid(slab_grid_file, params, x_names, y_names, random_seed=0):
+    
+    np.random.seed(int(random_seed))
+    
+    N = len(params)
+    
+    # 1. slab_grid 불러오기
+    slab_grid = pd.read_csv(slab_grid_file)
+    
+    # 2. slab_grid에서 각 행마다 무작위 샘플 하나씩 선택 (슬라이스로)
+    slab_idxs = np.random.randint(0, len(slab_grid), size=N)
+    matched_slab = slab_grid.iloc[slab_idxs].reset_index(drop=True)
+    
+    # 3. slab_norm 생성
+    spec_y_names = list(np.array(y_names)[get_spec_index(y_names, get_loc=True)])
+    slab_norm = matched_slab[spec_y_names].values
+    
+    # 4. np.nan 위치 중 slab_grid에 있는 값으로 채우기
+    slab_cols = set(slab_grid.columns)
+    x_fill_names = list(set(x_names) & set(slab_cols))
+    
+    # X 파라미터 채우기
+    for name in x_fill_names:
+        i = x_names.index(name)
+        col_data = params[:, i]
+        if np.all(np.isnan(col_data)):
+            params[:, i] = matched_slab[name].values
+        elif np.any(np.isnan(col_data)):
+            raise ValueError(f"Column '{name}' in params has partial NaNs, which is unexpected.")
+    
+    return params, slab_norm
+
+
+    
+    
 
 
 def get_muse_wl():
@@ -557,9 +679,9 @@ correlation (correlation between different sigmas in one obs):
                 
 sampling method: gaussian, uniform ([min, max), but exchange=> (min, max] )
 """    
-def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_method=None,
-                       lsig_mean=None, lsig_std = None, lsig_min=None, lsig_max=None,
-                       flux=None, wl=None, **kwarg ):
+def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_method=None, y_names=None,
+                       lsig_mean=None, lsig_std = None, lsig_min=None, lsig_max=None, 
+                       flux=None, noise_pdf=None,  **kwarg ):
     # flux: whole spectrum. includ masked area. 
     
     if len(size)==1:
@@ -596,20 +718,44 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
             rn = np.random.rand(lsig.shape[0])*(lsig_max - lsig_min) + lsig_min
         lsig += np.repeat(rn.reshape(-1,1), lsig.shape[1], axis=1)
         
-    elif correlation == 'Seg_Flux': # sigma sampled follwoing the flux. only uniform available
-        if sampling_method == 'uniform': # [min, max)
-            iseg_list = divide_wl_segment(wl, **kwarg) # Don;t need to set start and end -> automatically set
-            # default seg_size = 200AA
-            lsig = random_lsig_seg_flux_uniform(flux, iseg_list, lsig_min0=lsig_min, lsig_max0=lsig_max, **kwarg)
-            
-    elif correlation == 'Seg_Unif': # all sig componets are sampled from the same probability=p(sigma) but wl is segmented
-        iseg_list = divide_wl_segment(wl, **kwarg) # seg_size must be in kwarg  
+    elif 'Seg_' in correlation: 
+        # only for spectral y_components : 'l0','l20', etc,
+        # use same sigma for each segment
+        # you will get noise_pdf as kwarg if there is non spectral y component
+        # this requires: y_names
+        
         lsig = np.zeros(size)
-        for iseg, ind_seg in enumerate(iseg_list):
-            if sampling_method=='uniform':
-                lsig[:, ind_seg] = (np.random.rand(size[0]) * (lsig_max - lsig_min) + lsig_min).reshape(-1,1)
-            elif sampling_method=='gaussian':
-                lsig[:, ind_seg] = (np.random.randn(size[0]) * lsig_std + lsig_mean).reshape(-1,1)
+        # 1) sample lsig for spectral components
+        spec_indices = get_spec_index(y_names)
+        spec_locs = get_spec_index(y_names, get_loc=True)
+        wl = get_muse_wl()[spec_indices]
+        
+        iseg_list = divide_wl_segment(wl, **kwarg) # seg_size must be in kwarg, 
+        # Don't need to set start and end -> automatically set
+        
+        if correlation == 'Seg_Flux': # sigma sampled follwoing the flux (Poisson+sth). only uniform available
+            if sampling_method == 'uniform': # [min, max)
+                lsig[:, spec_locs] = random_lsig_seg_flux_uniform(flux, iseg_list, lsig_min0=lsig_min, lsig_max0=lsig_max, **kwarg)
+                # flux is alread in N_obs x N(spec_locs) size
+                # lsig_min, max is only used for the minimum sigma value per obs
+                
+        elif correlation == 'Seg_Unif': # all sig componets are sampled from the same probability=p(sigma) but the same sigma within the segment
+            for iseg, ind_seg in enumerate(iseg_list):
+                if sampling_method=='uniform':
+                    lsig[:, spec_locs[ind_seg]] = (np.random.rand(size[0]) * (lsig_max - lsig_min) + lsig_min).reshape(-1,1)
+                elif sampling_method=='gaussian':
+                    lsig[:, spec_locs[ind_seg]] = (np.random.randn(size[0]) * lsig_std + lsig_mean).reshape(-1,1)
+                    
+        # 2) sample lsig for non spectral components, if exist
+        # you will get 'noise_pdf' kwarg, if non spectral component exists
+        if noise_pdf is not None:
+            for param, pdf in noise_pdf.items():
+                # p(sigma) can be same as spectral components or not, it is already determined in noise_pdf
+                i_param = y_names.index(param)
+                if pdf['sampling']=='uniform':
+                    lsig[:, i_param] = np.random.rand(size[0]) * (pdf['lsig_max'] - pdf['lsig_min']) + pdf['lsig_min']
+                elif pdf['sampling']=='gaussian':
+                    lsig[:, i_param] = np.random.randn(size[0]) * pdf['lsig_std'] + pdf['lsig_mean']
 
             
     # elif correlation =='Seg_Poisson': # random for only the min Sig (maxFlux), other seg are determined by Poisson
@@ -1224,7 +1370,7 @@ def set_basic(ax, xrange=None, yrange=None,xlabel=None, ylabel=None, title=None,
     
 
 def scatter_color(fig, ax, xval, yval, cval, sval=40, plot_cbar=True, 
-                    marker='o', edgecolors='grey', cmap = cm.get_cmap("RdYlBu"), vmin=None, vmax=None,          
+                    marker='o', edgecolors='grey', cmap = plt.get_cmap("RdYlBu"), vmin=None, vmax=None,          
                     xrange=None, yrange=None, alpha=1,
                     xlabel=None, ylabel=None, title=None, label=None,
                     xlabelsize='large', ylabelsize='large', titlesize='x-large',

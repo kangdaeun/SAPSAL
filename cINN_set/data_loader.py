@@ -135,8 +135,8 @@ class DataLoader(cINNConfig):
         
     def read_database(self):
         tablename = self.tablename
-        x_names = self.x_names
-        y_names = self.y_names
+        # x_names = self.x_names
+        # y_names = self.y_names
         
         # try:
         #    whole_table = self.exp.expand_database(tablename, x_names + y_names)
@@ -180,37 +180,39 @@ class DataLoader(cINNConfig):
         # all_param = np.array(data_table[x_names]).view(np.float64).reshape(-1, len(x_names))
         # all_obs = np.array(data_table[y_names]).view(np.float64).reshape(-1, len(y_names))
         
-        f_min_dic, f_max_dic = None, None
-        if self.random_parameters is not None and self.additional_kwarg is not None:
-            try:
-                f_min_dic = self.additional_kwarg['f_min_dic']
-            except:
-                pass
-            try:
-                f_max_dic = self.additional_kwarg['f_max_dic']
-            except:
-                pass
         
+        if self.random_parameters is not None and self.additional_kwarg is not None:
+            f_min_dic = self.additional_kwarg.get('f_min_dic', {})
+            f_max_dic = self.additional_kwarg.get('f_max_dic', {})
+            
         all_param, all_obs = self.exp.divide_xy(self.database, x_names, y_names, 
                                                 random_parameters = self.random_parameters, random_seed=random_seed, 
                                                 f_min_dic = f_min_dic, f_max_dic = f_max_dic,
                                                 )
-        # get random parameter if it is set
-
         
         # 1) Add veiling 
         spec_indices = self.exp.get_spec_index(self.y_names)
+        spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
         if veil_flux:
             wl = self.exp.get_muse_wl()[spec_indices]
             # ordinary constant veilnig if use_Hslab_veiling is not True
             if self.use_Hslab_veiling:
                 # not a grid of model but just one
-                if self.use_one_Hslab_model: 
+                if self.use_one_Hslab_model==True: 
                     fslab_norm = self.exp.read_example_slab()[spec_indices]
-                    all_obs = self.exp.add_slab_veil(wl, all_obs[:, spec_indices], veil=all_param[:, x_names.index("veil_r")], fslab_750=fslab_norm)
-                # using Hslab grid is not ready yet
+                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:, spec_locs], veil=all_param[:, x_names.index("veil_r")], fslab_750=fslab_norm)
+                elif self.slab_grid is not None:
+                    # This will make fslab_norm only for corresponding y_names and add slab parameters to predict based on x_names
+                    # fslab_norm have N_model x N(spec_locs)
+                    # this fills nan values in all_params
+                    # possible slab parameters = ['Tslab', 'log_ne', 'log_tau0', 'log_Fslab']
+                    all_param, fslab_norm = self.exp.assign_slab_grid(self.slab_grid, all_param, x_names, y_names, random_seed=random_seed)
+                    # add veiling effect
+                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=all_param[:, x_names.index("veil_r")], fslab_750=fslab_norm)
+                else:
+                    raise ValueError("Invalid configuration: use_Hslab_veiling=True & use_one_slab_grid!=True, but slab_grid is not specified.")
             else:
-                all_obs[:, spec_indices] = self.exp.add_veil(wl, all_obs[:, spec_indices], veil=all_param[:, x_names.index("veil_r")] )
+                all_obs[:, spec_locs] = self.exp.add_veil(wl, all_obs[:, spec_locs], veil=all_param[:, x_names.index("veil_r")] )
         
         # 2) Add extinction
         if extinct_flux:
@@ -221,20 +223,20 @@ class DataLoader(cINNConfig):
                 Rv_array = all_obs[:, y_names.index("R_V")]
             else:
                 Rv_array = np.array(self.additional_kwarg["R_V"])
-            all_obs[:, spec_indices] = self.exp.extinct_spectrum(wl, all_obs[:, spec_indices], Av_array=all_param[:, x_names.index("A_V")], Rv_array = Rv_array )
+            all_obs[:, spec_locs] = self.exp.extinct_spectrum(wl, all_obs[:, spec_locs], Av_array=all_param[:, x_names.index("A_V")], Rv_array = Rv_array )
             
         
         
         # 3) Normalize flux: using total flux (small values), using mean flux (factor of len(y_names))
         if normalize_flux:
             if normalize_total_flux:
-                all_obs[:, spec_indices] = all_obs[:, spec_indices]/np.sum(all_obs[:, spec_indices], axis=1).reshape(-1,1)
+                all_obs[:, spec_locs] = all_obs[:, spec_locs]/np.sum(all_obs[:, spec_locs], axis=1).reshape(-1,1)
             elif normalize_mean_flux:
-                all_obs[:, spec_indices] = all_obs[:, spec_indices]/np.mean(all_obs[:, spec_indices], axis=1).reshape(-1,1)
+                all_obs[:, spec_locs] = all_obs[:, spec_locs]/np.mean(all_obs[:, spec_locs], axis=1).reshape(-1,1)
             elif normalize_f750:
                 wl = self.exp.get_muse_wl()[spec_indices]
-                f750_array = self.exp.get_dominika_f750_2d(wl, all_obs[:, spec_indices])
-                all_obs[:, spec_indices] = all_obs[:, spec_indices] / f750_array.reshape(-1,1)
+                f750_array = self.exp.get_dominika_f750_2d(wl, all_obs[:, spec_locs])
+                all_obs[:, spec_locs] = all_obs[:, spec_locs] / f750_array.reshape(-1,1)
                 
                 
         # 2) Smoothing parameter 
@@ -293,19 +295,29 @@ class DataLoader(cINNConfig):
                     self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + self.lsig_max)
                     self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(self.lsig_max-self.lsig_min)/np.sqrt(12) ) )
                     
-            elif self.unc_corrl == 'Seg_Flux':
-                if self.unc_sampling == 'uniform':
-                    lsig_max = self.lsig_min + 3
-                    self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + lsig_max)
-                    self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(lsig_max-self.lsig_min)/np.sqrt(12) ) )
+            else:
+                # just generate random lsig
+                if self.unc_corrl=='Seg_Flux':
+                    flux = all_obs[:, self.exp.get_spec_index(self.y_names, get_loc=True)]
+                else: 
+                    flux=None
+                lsig_example = self.create_uncertainty(all_obs.shape, flux=flux)  
+                self.mu_s = np.mean(lsig_example, 0)
+                self.w_s = stddev_matrix(lsig_example)
+                
+            # elif self.unc_corrl == 'Seg_Flux':
+            #     if self.unc_sampling == 'uniform':
+            #         lsig_max = self.lsig_min + 3
+            #         self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + lsig_max)
+            #         self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(lsig_max-self.lsig_min)/np.sqrt(12) ) )
            
-            elif self.unc_corrl == 'Seg_Unif': # all sig componets are sampled from the same probability=p(sigma) but wl is segmented
-                if self.unc_sampling == 'uniform':
-                    self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + self.lsig_max)
-                    self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(self.lsig_max-self.lsig_min)/np.sqrt(12) ) )
-                elif self.unc_sampling == 'gaussian':  
-                    self.mu_s = np.zeros(len(self.y_names)) + self.lsig_mean
-                    self.w_s = np.diag( 1/(np.zeros(len(self.y_names)) + self.lsig_std) )
+            # elif self.unc_corrl == 'Seg_Unif': # all sig componets are sampled from the same probability=p(sigma) but wl is segmented
+            #     if self.unc_sampling == 'uniform':
+            #         self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + self.lsig_max)
+            #         self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(self.lsig_max-self.lsig_min)/np.sqrt(12) ) )
+            #     elif self.unc_sampling == 'gaussian':  
+            #         self.mu_s = np.zeros(len(self.y_names)) + self.lsig_mean
+            #         self.w_s = np.diag( 1/(np.zeros(len(self.y_names)) + self.lsig_std) )
                     
         
         if self.use_flag:
@@ -389,20 +401,21 @@ class DataLoader(cINNConfig):
             ymin = np.min(np.abs(all_y), axis=1) # minimum value for each 
             # unc_corrl, unc_sampling etc are considerd 
             if self.unc_corrl=='Seg_Flux':
-                flux = all_y[:, self.exp.get_spec_index(self.y_names)]
+                flux = all_y[:, self.exp.get_spec_index(self.y_names, get_loc=True)]
             else: 
                 flux=None
-            sig = self.create_uncertainty(all_y.shape, flux=flux)  # now expand, n_sig_MC, c.n_noise_MC are deprecated
+            lsig = self.create_uncertainty(all_y.shape, flux=flux)  # now expand, n_sig_MC, c.n_noise_MC are deprecated
+            sig = 10**lsig
             # if c.n_sig_MC*c.n_noise_MC > 1:
             #     # N_mc expansion (n_noise_MC) + noise sampling (all line independent)
             #     x = torch.repeat_interleave(x, c.n_sig_MC*c.n_noise_MC, dim=0) 
             #     y = torch.repeat_interleave(y, c.n_sig_MC*c.n_noise_MC, dim=0)
             #     sig = torch.repeat_interleave(sig, c.n_noise_MC, dim=0)
-            all_y = np.clip( all_y * (1+ (10**(sig))*np.random.randn(*all_y.shape)), a_min=ymin.reshape(-1,1), a_max=None ) # all line independent
+            all_y = np.clip( all_y * (1+ sig*np.random.randn(*all_y.shape)), a_min=ymin.reshape(-1,1), a_max=None ) # all line independent
             
             # Transform to rescaled: np array again
             all_x = self.params_to_x(all_x)
-            all_y = np.hstack( (self.obs_to_y(all_y), self.unc_to_sig(10**sig) ) )
+            all_y = np.hstack( (self.obs_to_y(all_y), self.unc_to_sig(sig) ) )
         
         #-----------------------------------
         all_x = torch.Tensor(all_x)
@@ -525,18 +538,41 @@ class DataLoader(cINNConfig):
         for att in ['lsig_min', 'lsig_max', 'lsig_mean', 'lsig_std']:
             kwarg[att] = getattr(self, att)
             
-        if 'Seg' in self.unc_corrl:
-            spec_indices = self.exp.get_spec_index(self.y_names)
-            wl = self.exp.get_muse_wl()[spec_indices]
-            kw_seg = {'seg_size':getattr(self, 'wl_seg_size'),  'wl':wl, 'maxlgap':3 } # basic settup. you can update by sending kwarg
+        if 'Seg' in self.unc_corrl: 
+            # only for spectral y component
+            # spec_indices = self.exp.get_spec_index(self.y_names)
+            # wl = self.exp.get_muse_wl()[spec_indices]
+            kw_seg = {'seg_size':getattr(self, 'wl_seg_size'),  #'wl':wl, 
+                      'y_names': getattr(self, 'y_names'),
+                      'maxlgap':3 } # basic settup. you can update by sending kwarg
             kw_seg.update(kwarg)
             kwarg = kw_seg
             if self.unc_corrl=='Seg_Flux':
                 if 'flux' not in kwarg.keys():
                     sys.exit("Flux is missing in random sigma sampling with Seg_Flux option")
             
-        return self.exp.calculate_random_uncertainty(size, expand=expand, correlation=self.unc_corrl, sampling_method=self.unc_sampling,
-                            **kwarg)
+            spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
+            if len(spec_locs) < len(self.y_names): 
+                # non spectral y components exist
+                # check if special sampling is set for this value
+                non_spec_locs = np.array([k for k in range(len(self.y_names)) if k not in spec_locs])
+                noise_pdf = {}
+                for param in [self.y_names[loc] for loc in non_spec_locs]:
+                    if param+'_noise_pdf' in self.additional_kwarg.keys(): # 'R_V_noise_pdf
+                        noise_pdf[param] = self.additional_kwarg[param+'_noise_pdf']
+                        # this must contain 'sampling', and related 'lsig_min', 'lsig_max', etc
+                    else:
+                        # if not set, use the same pdf as spectral components
+                        noise_pdf[param]={'sampling': self.unc_sampling}
+                        for att in ['lsig_min', 'lsig_max', 'lsig_mean', 'lsig_std']:
+                            noise_pdf[param][att] = kwarg[att]
+                            
+                kwarg['noise_pdf']=noise_pdf
+            
+       
+        return self.exp.calculate_random_uncertainty(size, expand=expand, 
+                                                     correlation=self.unc_corrl, sampling_method=self.unc_sampling,
+                                                     **kwarg)
          
     def create_random_flag(self, N_data):
         """
@@ -550,7 +586,7 @@ class DataLoader(cINNConfig):
         """
         Create wavelength corresponding to the flux
         """
-        wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in self.y_names])]
+        wl = self.exp.get_muse_wl()[self.exp.get_spec_index(self.y_names)]
         return np.repeat(wl.reshape(1,-1), N_data, axis=0)
 
 

@@ -65,11 +65,11 @@ GROUP_SIZE = 400 # n(obs) per one iteration of get_posterior
 N_PRED = 4096 # latent variable sampling  
 
 
-GPU_MAX_LOAD = 0.4           # Maximum compute load of GPU allowed in automated selection
-GPU_MAX_MEMORY = 0.4         # Maximum memory load of GPU allowed in automated selection
+GPU_MAX_LOAD = 0.5           # Maximum compute load of GPU allowed in automated selection. GPUs with a load larger than maxLoad is not returned.
+GPU_MAX_MEMORY = 0.5         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
-GPU_EXCLUDE_IDS = [1,2] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
+GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
 
 VERBOSE = True           # Switch for progress messages
 
@@ -109,7 +109,10 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     filename_dic = {}; figurename_dic = {}
     if c.prenoise_training==True and lsig_fix is not None:
         # change filenames _{}
-        adding = "_lsig{:.4g}".format(lsig_fix)
+        if lsig_fix=="random":
+            adding = "_lsig_random"
+        else:
+            adding = "_lsig{:.4g}".format(lsig_fix)
     
     if eval_z:
         print("Request eval_z")
@@ -291,9 +294,9 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         # for z tests, keep similar to training situation: raundom sigma, smoothing 
         z_all = tools.calculate_z(c.network_model, astro, smoothing=c.train_smoothing)
         tools.plot_z(z_all, figname=figurename_dic['z_cov'], corrlabel=True, title=network_name,
-                     legend=True, covariance=True, cmap=cm.get_cmap("gnuplot"), color_letter='r', return_figure=False)#, yrange1=[-0.04, 0.6], yrange2=[-0.1, 0.2])
+                     legend=True, covariance=True, cmap=plt.get_cmap("gnuplot"), color_letter='r', return_figure=False)#, yrange1=[-0.04, 0.6], yrange2=[-0.1, 0.2])
         tools.plot_z(z_all, figname=figurename_dic['z_corr'], corrlabel=True, title=network_name,
-                     legend=True, covariance=False, cmap=cm.get_cmap("gnuplot"), color_letter='r', return_figure=False)
+                     legend=True, covariance=False, cmap=plt.get_cmap("gnuplot"), color_letter='r', return_figure=False)
         if VERBOSE:
             print("Saved Z covariance and distributions")
         df = tools.latent_normality_tests(z_all, filename=filename_dic['z_test'])
@@ -393,19 +396,31 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             if c.prenoise_training==True:
                 # if c.unc_corrl == 'Ind_Man' or c.unc_corrl == 'Ind_Unif' or c.unc_corrl == 'Single' :
                 if lsig_fix is not None: # for requested lsig
-                    lsig_mid = lsig_fix
+                    if lsig_fix=="random": # use random sigma as training
+                        if c.unc_corrl=='Seg_Flux':
+                            flux = obs_group[:, astro.exp.get_spec_index(c.y_names, get_loc=True)]
+                        else:
+                            flux = None
+                        lsig_group = astro.create_uncertainty(obs_group.shape, flux=flux) # created different lsig for all obs, 
+                    
+                    else:
+                        lsig_group = lsig_fix # fixed one value
                 else:
                     # Currently not supported for Seg_Flux option
                     if c.unc_sampling == 'gaussian':
-                        lsig_mid = c.lsig_mean
+                        lsig_group = c.lsig_mean
                     elif c.unc_sampling == 'uniform':
-                        lsig_mid = 0.5*(c.lsig_min + c.lsig_max)
+                        lsig_group = 0.5*(c.lsig_min + c.lsig_max)
                 
-                if np.ndim(lsig_mid)==0: # one value
-                    lsig_mid = np.repeat(lsig_mid, obs_group.shape[1]) # const -> 1D array
+                # change dimension
+                if np.ndim(lsig_group)==0: # one value
+                    # lsig_group = np.repeat(lsig_group, obs_group.shape[1]) # const -> 2D array
+                    lsig_group = np.full(obs_group.shape, lsig_group)  # const -> 2D array
+                elif np.ndim(lsig_group)==1: # one spectra
+                    lsig_group = np.tile(lsig_group, (obs_group.shape[0], 1))
                 
                 # same error for all observations
-                unc_group = 10**np.repeat([lsig_mid], obs_group.shape[0], axis=0)
+                unc_group = 10**lsig_group
             else:
                 unc_group = None
                 
@@ -652,7 +667,7 @@ if __name__=='__main__':
     
     parser.add_argument('config_file', help="Run with specified config file as basis.")
     parser.add_argument('-d','--device', required=False, default=None, help="device for network")
-    parser.add_argument('-l','--lsig', required=False, default=None, help="Const log (sigma) for Noise-Net evaluation. If this is set, the filenames change.")
+    parser.add_argument('-l','--lsig', required=False, default=None, help="Const log (sigma) or random for Noise-Net evaluation. If this is set, the filenames change.")
     parser.add_argument('-g', '--group_size', type=int, default=GROUP_SIZE, help="# of obs per one posterior processing (Default=400)")
     parser.add_argument('-L','--log', required=False, default=True, help="Save logfile T/F")
     
@@ -680,8 +695,12 @@ if __name__=='__main__':
         
     # for Noise-Net, if specific lsig is set
     if c.prenoise_training==True and args.lsig is not None:
-        lsig_set = float(args.lsig)
-        print("Use specific lsig (%f) for this evaluation"%lsig_set)
+        if args.lsig == 'random':
+            lsig_set = "random"
+            print("Use random lsig as training")
+        else:
+            lsig_set = float(args.lsig)
+            print("Use specific lsig (%f) for this evaluation"%lsig_set)
     else:
         lsig_set = None
         
@@ -700,6 +719,11 @@ if __name__=='__main__':
         # logfile = new_logfile
         
         logfile = logpath.replace('/','.') + os.path.basename(c.filename)+'_eval.log'
+        if lsig_set is not None:
+            if  lsig_set=="random":
+                logfile = logfile.replace('.log', '_lsig_{}.log'.format(lsig_set))
+            else:
+                logfile = logfile.replace('.log', '_lsig_{:g}.log'.format(lsig_set))
         
         # sys.stdout = Logger(logfile, log_mode=LOG_MODE, mode="a") # continue logging
         logger = Logger(logfile, log_mode=LOG_MODE, mode="a")
@@ -752,6 +776,11 @@ if __name__=='__main__':
         logger.close()
         
         new_logfile = logpath + os.path.basename(c.filename) +'_eval.log'
+        if lsig_set is not None:
+            if  lsig_set=="random":
+                new_logfile = new_logfile.replace('.log', '_lsig_{}.log'.format(lsig_set))
+            else:
+                new_logfile = new_logfile.replace('.log', '_lsig_{:g}.log'.format(lsig_set))
         os.system("mv {} {}".format(logfile, new_logfile)  )
 
     

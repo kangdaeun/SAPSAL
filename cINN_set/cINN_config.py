@@ -217,6 +217,7 @@ class cINNConfig():
                     
                     'use_Hslab_veiling': None, #T/F
                     'use_one_Hslab_model': None, #T/F
+                    'slab_grid': None, # path to slab grid file (.csv) # if use_Hslab_veiling=True but use_one_Hslab_model !=True, thatn automatically read slab_grid
                     
                     # Randomizing parameter on the fly
                     'random_parameters': None, # dictionary
@@ -378,6 +379,8 @@ class cINNConfig():
             self.tablename = projdir + self.tablename
             if self.domain_adaptation:
                 self.real_database = projdir + self.real_database
+            if self.slab_grid is not None:
+                self.slab_grid = projdir + self.slab_grid
         # if change_expander:
         #     self.expander = projdir + self.expander
         
@@ -694,6 +697,7 @@ class cINNConfig():
     
     
     def write_config(self, config_comment = None, str_x_names = None, str_y_names=None,
+                     use_str_names=False,
                      str_flag_items=None):
         # usually write short config_name for config_comment
         
@@ -712,6 +716,17 @@ class cINNConfig():
                 txt += " # %s"%comment
             return txt
         
+        def format_list(name, items, max_items_per_line=10):
+            if len(items) <= max_items_per_line:
+                return f"{name} = [\n\t" + "',\n\t'".join(items) + "'\n]"
+            else:
+                lines = []
+                for i in range(0, len(items), max_items_per_line):
+                    chunk = items[i:i + max_items_per_line]
+                    line = ", ".join(f"'{item}'" for item in chunk)
+                    lines.append(line)
+                return f"{name} = [\n\t" + ",\n\t".join(lines) + "\n]"
+        
         # write cINN_parameter_arg first (something to control)
         
         # START
@@ -726,19 +741,20 @@ class cINNConfig():
         
         # x_names, y_names, tablename, expander
         contents.append( "# x_names and y_names according to DB (tablename) column names")
-        # check the dim of parameters
-        if  (len(self.x_names) > 30) * (str_x_names == None) :
-            raise Exception("Too many items in x_names to write! \n Use str_x_names=")
-        elif (len(self.y_names) > 30) * (str_y_names == None) :
-            raise Exception("Too many items in y_names to write! \n Use str_y_names=")
+       
+        # get string from config_file
+        if use_str_names==True:
+            str_x_names, str_y_names = self.find_str_names(self.config_file)
             
         if str_x_names == None:
-            contents.append( "x_names = [\n\t'%s'\n]"%("' ,\n\t'".join(self.x_names))  )
+            # contents.append( "x_names = [\n\t'%s'\n]"%("' ,\n\t'".join(self.x_names))  )
+            contents.append(format_list("x_names", self.x_names, max_items_per_line=5))
         else:
             contents.append( "x_names = %s"%(str_x_names) )
     
         if str_y_names == None:
-            contents.append( "y_names = [\n\t'%s'\n]"%("' ,\n\t'".join(self.y_names))  )
+            # contents.append( "y_names = [\n\t'%s'\n]"%("' ,\n\t'".join(self.y_names))  )
+            contents.append(format_list("y_names", self.y_names, max_items_per_line=10))
         else:
             contents.append( "y_names = %s"%(str_y_names) )
         new_line(contents)
@@ -807,7 +823,9 @@ class cINNConfig():
         if self.use_Hslab_veiling:
             contents.append( "# Veiling option (using Hydrogen Slab model for veiling)")
             contents.append(simple_sentence(self, "use_Hslab_veiling"))
-            contents.append(simple_sentence(self, "use_one_Hslab_model"))
+            contents.append(simple_sentence(self, "use_one_Hslab_model", comment="If True, it use one example slab model for all. slab_grid is ignored"))
+            contents.append(simple_sentence(self, "slab_grid", comment="Path to slab grid file (.csv)"))
+            contents.append("# If use_Hslab_veiling=True but use_one_Hslab_model !=True, then automatically read slab_grid")
         new_line(contents)
         
         # [deprecated] if you turn on noisy training
@@ -822,8 +840,8 @@ class cINNConfig():
         contents.append('# Prenoise training (Noise-Net): Use dY/Y as additional conditions')
         contents.append(simple_sentence(self, "prenoise_training"))
         if self.prenoise_training == True:
-            contents.append(simple_sentence(self, "n_sig_MC", comment="This must be 1 (will be deprecated)"))
-            contents.append(simple_sentence(self, "n_noise_MC", comment="This must be 1 (will be deprecated)"))
+            # contents.append(simple_sentence(self, "n_sig_MC", comment="This must be 1 (will be deprecated)"))
+            # contents.append(simple_sentence(self, "n_noise_MC", comment="This must be 1 (will be deprecated)"))
             
             contents.append('# Correlation between uncertainies in one obs')
             contents.append(simple_sentence(self, "unc_corrl"))

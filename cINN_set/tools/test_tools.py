@@ -159,7 +159,7 @@ def calculate_z(model, astro, smoothing=True):
 
 
 def plot_z(z_all, figname=None, corrlabel=True, legend=True, yrange1=None, yrange2=None, 
-           covariance = True, cmap=cm.get_cmap("gnuplot"), color_letter='r', return_figure=False,
+           covariance = True, cmap=plt.get_cmap("gnuplot"), color_letter='r', return_figure=False,
            title=None, titlesize='large'):
     
     """
@@ -182,7 +182,7 @@ def plot_z(z_all, figname=None, corrlabel=True, legend=True, yrange1=None, yrang
      covariance : bool, optional
          Use correlation coeffient or covariance. The default is True.
      cmap : colormap, optional
-         colormap of z correlation matrix. The default is cm.get_cmap("gnuplot").
+         colormap of z correlation matrix. The default is plt.get_cmap("gnuplot").
      color_letter : str, optional
          color of corrlabel. The default is 'r'.
 
@@ -244,7 +244,7 @@ def plot_z(z_all, figname=None, corrlabel=True, legend=True, yrange1=None, yrang
             yhis, xhis = np.histogram(z_all.ravel(), bins=bins, range=hrange, density=True)
         else:
             yhis, xhis = np.histogram(z_all[:,i-1], bins=bins, range=hrange, density=True)
-            line=ax.step( 0.5*(xhis[:-1]+xhis[1:]), yhis, where='mid', lw=1, label='$z_{%d}$'%i )
+            line=ax.step( 0.5*(xhis[:-1]+xhis[1:]), yhis, where='mid', lw=1, label='$z_{%d}$'%(i-1) )
             line_color[i] = line[0].get_color()
         hist_dic[i] = {'yhis':yhis,'xhis':xhis}
 
@@ -624,7 +624,11 @@ def plot_TvP(hist_dic, c, rmse_table, N_test, plotting_map=False, discretized_pa
         
             ax.set_xlim(xr); ax.set_ylim(yr)
         
-        ax.text(0.95, 0.05, 'RMSE = %.4g\n'%(rmse_table[param][rmse_table['type']=='RMSE_ALL_PARAM'][0])+r'N$_{\mathrm{test}}$ = %d'%(N_test),  
+        if plotting_map:
+            txt = 'RMSE = %.4g\n'%(rmse_table[param][rmse_table['type']=='RMSE_MAP_PARAM'][0])+r'N$_{\mathrm{test}}$ = %d'%(N_test)
+        else:
+            txt = 'RMSE = %.4g\n'%(rmse_table[param][rmse_table['type']=='RMSE_ALL_PARAM'][0])+r'N$_{\mathrm{test}}$ = %d'%(N_test)
+        ax.text(0.95, 0.05, txt,  
                 transform=ax.transAxes, ha='right', va='bottom', fontsize=9,
                  bbox=dict(boxstyle='square', facecolor='w', alpha=1, edgecolor='silver') )
 
@@ -856,7 +860,7 @@ def calculate_umap(model, astro, smoothing=False, do_pca = False, n_components_p
     return features_2d, labels, cval
 
 def visualize_domain(features_2d, labels, 
-                     color_source = 'tab:blue', norm=None, cmap = cm.get_cmap("gnuplot"), clabel=None, marker_source = 'o', marker_target='s',
+                     color_source = 'tab:blue', norm=None, cmap = plt.get_cmap("gnuplot"), clabel=None, marker_source = 'o', marker_target='s',
                      label_source='Source', label_target='Target', alpha_source=0.2, alpha_target=0.7, size_source=8, size_target=5, color_target = 'tab:green', 
                      fig=None, ax=None, figsize=[6,5], legend_loc='best', legend_size = 'medium', plot_colorbar=False,
                      title = 't-SNE of Source and Target Features', title_size='large', clabel_size = 'large', 

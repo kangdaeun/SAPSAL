@@ -14,8 +14,8 @@ from time import time
 
 # # from cINN.test_execute import train_network
 
-GPU_MAX_LOAD = 0.5          # Maximum compute load of GPU allowed in automated selection
-GPU_MAX_MEMORY = 0.5         # Maximum memory load of GPU allowed in automated selection
+GPU_MAX_LOAD = 0.6           # Maximum compute load of GPU allowed in automated selection
+GPU_MAX_MEMORY = 0.6         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
