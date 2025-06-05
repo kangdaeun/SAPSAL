@@ -1,8 +1,25 @@
-# Estimating stellar parameters from the optical stellar spectrum 
+# SAPSAL
+
+**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with Neural Networks)** is a deep learning framework for analysing stellar spectra using conditional invertible neural networks (cINNs). 
 
 ## 1. Introduction
 
 This repository provides Python codes to build and run the cINN for the stellar spectrum introduced in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html).
+
+## Features
+
+- Conditional Invertible Neural Network (cINN) implementation based on [FrEIA](https://github.com/vislearn/FrEIA)
+- Domain adaptation through adversarial training
+- Modular model definitions (`models/`)
+- Tools for data pre-processing, training, and evaluation
+
+## Folder Structure
+
+
+
+<!--
+# Estimating stellar parameters from the optical stellar spectrum 
+-->
 
 
 필요한 내용
