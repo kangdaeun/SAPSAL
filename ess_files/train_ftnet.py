@@ -15,11 +15,11 @@ from argparse import ArgumentParser
 
 # sys.path.append("/export/scratch/dekang/ECOGAL/cinn_ssp/Networks/")
 
-import cINN_set.tools.hs_tools as hs_tools
-from cINN_set.tools.test_tools import plot_z
-from cINN_set.cINN_config import read_config_from_file
-from cINN_set.data_loader import DataLoader
-from cINN_set.execute import train_ftrans_network
+import sapsal.tools.hs_tools as hs_tools
+from sapsal.tools.test_tools import plot_z
+from sapsal.cINN_config import read_config_from_file
+from sapsal.data_loader import DataLoader
+from sapsal.execute import train_ftrans_network
 
 NUM_CONFIG = 70 # number of config file for one random seed
 MAX_EPOCH = 250 # max epoch for each training. usually its hard to meet converge 

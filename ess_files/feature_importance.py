@@ -39,8 +39,8 @@ import torch
 from astropy.table import Table, vstack, Column
 from astropy.io import ascii
 
-from cINN_set.cINN_config import read_config_from_file
-from cINN_set.data_loader import DataLoader
+from sapsal.cINN_config import read_config_from_file
+from sapsal.data_loader import DataLoader
 
 import copy
 

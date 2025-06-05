@@ -1,4 +1,4 @@
-from scipy.ndimage import zoom
+# from scipy.ndimage import zoom
 import numpy as np
 import os
 import sys

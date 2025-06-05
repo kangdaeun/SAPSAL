@@ -31,11 +31,11 @@ import matplotlib.ticker as ticker
 # import torch
 from astropy.table import Table, vstack
 
-from cINN_set.cINN_config import read_config_from_file
-from cINN_set.data_loader import DataLoader
-from cINN_set.tools import test_tools as tools
-from cINN_set.tools.logger import Logger
-# from cINN_set.tools.test_tools import plot_calibration
+from sapsal.cINN_config import read_config_from_file
+from sapsal.data_loader import DataLoader
+from sapsal.tools import test_tools as tools
+from sapsal.tools.logger import Logger
+# from sapsal.tools.test_tools import plot_calibration
 import copy
 
 

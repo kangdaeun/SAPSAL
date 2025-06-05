@@ -1,0 +1,68 @@
+# 아직업로드안할파일
+sapsal/Slab_T7_N13_t1_n750.png
+sapsal/Slab_T7_N13_t1_n750.txt
+ess_files/Saliency_map.py
+ess_files/feature_importance_multi.py
+ess_files/feature_importance_new.py
+ess_files/frp_resim_Tr14.py
+ess_files/frp_resim_eval.py
+ess_files/eval_Rv_depence_models.py
+networks/SpD_TGARL_Noise_mMUSE/SpD_TGARL_Noise_mMUSE.pt
+networks/SpD_TGARL_Noise_mMUSE/__pycache__/
+networks/Stl_TGA_tpl/Stl_TGA_tpl.pt
+setup_notready.py
+
+
+# macOS 시스템 파일
+.DS_Store
+
+# Python 관련
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 에디터 관련 임시 파일
+*~
+.*~
+.~*
+# vim swap files
+*.swp
+*.swo
+
+# Jupyter Notebook 체크포인트
+.ipynb_checkpoints/
+
+# 환경설정, 가상환경 폴더
+.env/
+venv/
+ENV/
+env.bak/
+env/
+
+# 로그 파일
+*.log
+
+# 데이터 파일 (필요 없으면 추가)
+#*.csv
+#*.h5
+#*.hdf5
+#*.pickle
+#*.pkl
+
+# 임시 빌드, 배포 폴더
+build/
+dist/
+*.egg-info/
+
+# 개인 설정 파일 (IDE, 에디터)
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# 기타 불필요한 파일
+*.bak
+*.tmp
+*.swp
+

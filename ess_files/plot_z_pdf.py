@@ -9,10 +9,10 @@ from time import time
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 # import matplotlib.gridspec as gridspec
 
-from cINN_set.cINN_config import *
-from cINN_set.data_loader import *
-#from cINN_set.models import *
-from cINN_set.tools import test_tools as tools
+from sapsal.cINN_config import *
+from sapsal.data_loader import *
+#from sapsal.models import *
+from sapsal.tools import test_tools as tools
 
 GPU_MAX_LOAD = 0.2           # Maximum compute load of GPU allowed in automated selection
 GPU_MAX_MEMORY = 0.2         # Maximum memory load of GPU allowed in automated selection

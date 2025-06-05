@@ -7,14 +7,14 @@ Created on Fri Jan 28 16:25:09 2022
 
 2022. 8. 30
 In proj_dir, you need ess_files/ and Database/
-cINN_set is not necessary but it's convinient to make cINN_set as well (for some codes in ess_files, it is necessary)
+sapsal is not necessary but it's convinient to make sapsal as well (for some codes in ess_files, it is necessary)
 
 Input argument of this code is your proj_dir (relative path to current working directory or abspath)
 
 The code will make a symbolic link of
 ess_files/ 
 Database/
-cINN_set/
+sapsal/
 in your proj_dir
 """
 import os, sys, glob
@@ -24,7 +24,7 @@ import os, sys, glob
 
 ess_dir = '/Users/daeun/Astronomy/Pj_cinn_ssp/cINN_SSP/ess_files' # abspath to real files (not symbolic link)
 db_dir = '/Users/daeun/Astronomy/Pj_cinn_ssp/Database' # abspath
-cINN_set_dir = '/Users/daeun/Astronomy/Pj_cinn_ssp/cINN_SSP/cINN_set'
+sapsal_dir = '/Users/daeun/Astronomy/Pj_cinn_ssp/cINN_SSP/sapsal'
 
 
 proj_dir = sys.argv[1]
@@ -34,7 +34,7 @@ if proj_dir[-1]!='/':
 if not os.path.exists(proj_dir):
     sys.exit('There is no %s \nCheck the directory name'%proj_dir)
 
-ori_path_list = [ess_dir, db_dir, cINN_set_dir]
+ori_path_list = [ess_dir, db_dir, sapsal_dir]
     
 n_pass = 0
 n_done = 0

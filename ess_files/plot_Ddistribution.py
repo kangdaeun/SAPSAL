@@ -38,8 +38,8 @@ elif platform == "darwin":
 print("main_dir",main_dir)
 sys.path.append(main_dir+"cINN_SSP/")
 # sys.path.append("/Users/daeun/Astronomy/Pj_cinn_ssp/Networks/")
-from cINN_set.cINN_config import read_config_from_file
-from cINN_set.data_loader import DataLoader
+from sapsal.cINN_config import read_config_from_file
+from sapsal.data_loader import DataLoader
 
 
 config_dic={}

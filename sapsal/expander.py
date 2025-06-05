@@ -351,7 +351,7 @@ def add_slab_veil(wl, fl, veil, fslab_750):
 
 # read already saved one slab
 def read_example_slab():
-    package = "cINN_set"
+    package = "sapsal"
     filename = "Slab_T7_N13_t1_n750.txt"
     if sys.version_info >= (3, 9):  # Python 3.9 
         with resources.files(package).joinpath(filename).open("r", encoding="utf-8") as f:

@@ -11,9 +11,9 @@ plot loss function after training
 import numpy as np
 import matplotlib.pyplot as plt
 import sys, os
-from cINN_set.cINN_config import *
-from cINN_set.viz import plot_loss_curve
-from cINN_set.viz import plot_loss_curve_2types
+from sapsal.cINN_config import *
+from sapsal.viz import plot_loss_curve
+from sapsal.viz import plot_loss_curve_2types
 
 #config_file = 'config_rncpr01_x7_y12_02'
 config_file = sys.argv[1]    

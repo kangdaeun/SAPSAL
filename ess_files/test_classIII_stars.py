@@ -24,8 +24,8 @@ import warnings
 from astropy.table import Table#, hstack
 warnings.filterwarnings("ignore")
 sys.path.append("/export/scratch/dekang/ECOGAL/cinn_ssp/Networks/")
-from cINN_set.cINN_config import read_config_from_file
-from cINN_set.tools.test_tools import check_training_status
+from sapsal.cINN_config import read_config_from_file
+from sapsal.tools.test_tools import check_training_status
 
 
 main_dir = '/export/scratch/dekang/ECOGAL/cinn_ssp/'

@@ -52,12 +52,12 @@ from argparse import ArgumentParser
 from time import time
 from time import sleep
 
-from cINN_set.cINN_config import read_config_from_file
-# from cINN_set.data_loader import *
-# from cINN_set.execute import train_network as train_normal_network
+from sapsal.cINN_config import read_config_from_file
+# from sapsal.data_loader import *
+# from sapsal.execute import train_network as train_normal_network
 
-import cINN_set.tools.hs_tools as tools
-import cINN_set.tools.test_tools as test_tools #combine_multiple_evaluations
+import sapsal.tools.hs_tools as tools
+import sapsal.tools.test_tools as test_tools #combine_multiple_evaluations
 
 
 ###########

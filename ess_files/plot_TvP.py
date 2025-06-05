@@ -35,8 +35,8 @@ import matplotlib.colors as clr
 import matplotlib.ticker as ticker
 
 
-from cINN_set.cINN_config import *
-from cINN_set.data_loader import *
+from sapsal.cINN_config import *
+from sapsal.data_loader import *
 
 import copy
 

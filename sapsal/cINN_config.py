@@ -655,7 +655,7 @@ class cINNConfig():
                 self.load_rescale_params()
             except Exception as e:
                 if verbose:
-                    print('Cannot load rescale parameters: %s'%e)
+                    print('(Skip for first training) Cannot load rescale parameters: %s'%e)
 
         except Exception as e:
             sys.exit(e)

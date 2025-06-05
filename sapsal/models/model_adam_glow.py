@@ -78,7 +78,7 @@ class ModelAdamGLOW(nn.Module):
     
     def build_network(self, c):
         
-        # 2023. 8. 11. FrEIA_ver deprecated (use FrEIA >= 0.2 in cINN_set)
+        # 2023. 8. 11. FrEIA_ver deprecated (use FrEIA >= 0.2 in package)
         INN = Ff.GraphINN
     
         

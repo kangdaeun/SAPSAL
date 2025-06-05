@@ -4,10 +4,10 @@
 # import os
 import sys, os
 import torch
-from cINN_set.cINN_config import read_config_from_file
-from cINN_set.data_loader import DataLoader
-from cINN_set.execute import train_network #test
-from cINN_set.tools.logger import Logger
+from sapsal.cINN_config import read_config_from_file
+from sapsal.data_loader import DataLoader
+from sapsal.execute import train_network #test
+from sapsal.tools.logger import Logger
 
 from argparse import ArgumentParser
 from time import time
@@ -126,19 +126,19 @@ if __name__ == '__main__':
     
     # Run train_network function in cINN.execute
     if c.prenoise_training == True:
-        # from cINN_set.execute import train_prenoise_network
+        # from sapsal.execute import train_prenoise_network
         # train_prenoise_network(c, data=astro, max_epoch=MAX_EPOCH)
         train_network(c, data=astro, max_epoch=MAX_EPOCH, resume=resume) # now train_prenoise_network is combined with train_network
     elif c.use_flag == True:
-        from cINN_set.execute import train_flag_network
+        from sapsal.execute import train_flag_network
         train_flag_network(c, data=astro, max_epoch=MAX_EPOCH)
     elif c.wavelength_coupling == True:
-        from cINN_set.execute import train_wc_network
+        from sapsal.execute import train_wc_network
         train_wc_network(c, data=astro, max_epoch=MAX_EPOCH)
     else:
         if c.domain_adaptation:
             if c.da_without_discriminator:
-                from cINN_set.execute import train_network_DAwoD
+                from sapsal.execute import train_network_DAwoD
                 train_network_DAwoD(c, data=astro, max_epoch=MAX_EPOCH)
         else:
             train_network(c, data=astro, max_epoch=MAX_EPOCH)
