@@ -1,11 +1,44 @@
 # SAPSAL
 
-**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with Neural Networks)** is a deep learning framework for analysing stellar spectra using conditional invertible neural networks (cINNs). 
+**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with Neural Networks)** is a deep learning toolkit for analysing optical stellar spectra using conditional invertible neural networks (cINNs). 
+
+From MUSE spectra, SAPSAL networks give a full posterior distribution of stellar parameters.
 
 ## 1. Introduction
 
-This repository provides Python codes to build and run the cINN for the stellar spectrum introduced in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html).
+This repository provides Python codes to build and run the cINN introduced in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html), Kang et al. 2025.
 
+## 2. Requirements
+To write
+- Python packages and versions
+
+## 3. How to use pre-trained networks
+To write
+- a list of neural networks available + relevant citation
+- tutorial codes
+
+
+
+
+## 필요한 내용
+- 필요한 파이썬 패키지들 (버전, 용도, 조건)
+- 몇가지 훈련된 네트워크 세트 (pt파일, config)
+- 훈련된 네트워크 사용방법 알려주는 주피터 노트북: 패키지 경로설정, 클래스 활용 기본, 포스테리어 얻기, MAP-unc 등 계산, 그림그리는 툴
+- 임시로 MUSE 스펙트럼 파일 하나 예시. (example directory가 필요)
+
+## Citation
+If you use SAPSAL in your work, please cite the papers below.
+
+
+## License
+
+This project is licensed under the MIT License.
+
+It includes code from the FrEIA library (https://github.com/vislearn/FrEIA),  
+which is also licensed under the MIT License.
+
+
+<!--
 ## Features
 
 - Conditional Invertible Neural Network (cINN) implementation based on [FrEIA](https://github.com/vislearn/FrEIA)
@@ -17,25 +50,5 @@ This repository provides Python codes to build and run the cINN for the stellar 
 
 
 
-<!--
-# Estimating stellar parameters from the optical stellar spectrum 
 -->
-
-
-필요한 내용
-- 필요한 파이썬 패키지들 (버전, 용도, 조건)
-- 몇가지 훈련된 네트워크 세트 (pt파일, config)
-- 훈련된 네트워크 사용방법 알려주는 주피터 노트북: 패키지 경로설정, 클래스 활용 기본, 포스테리어 얻기, MAP-unc 등 계산, 그림그리는 툴
-- 임시로 MUSE 스펙트럼 파일 하나 예시. (example directory가 필요)
-
-
-
-
-
-## License
-
-This project is licensed under the MIT License.
-
-It includes code from the FrEIA library (https://github.com/vislearn/FrEIA),  
-which is also licensed under the MIT License.
 
