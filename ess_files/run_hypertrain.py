@@ -137,7 +137,7 @@ SEARCH_PARAMETERS = {
     "seed_weight_init" : (np.random.randint, {"low":1, "high":241542})
     }
 
-#%%
+
 
 def change_suffix(suffix):
     global OUTPUT_SUFFIX # change global variable
@@ -219,7 +219,7 @@ def make_random_config(c_ref, n):
 
     return config
     
-#%%   
+  
 def set_device(config):
     # Find a free GPU to run on if DEVICE == cuda
     if "cuda" in config.device:
@@ -249,11 +249,12 @@ def check_device(device_id):
                            excludeID=exclude_id)
     return bool( bool_available[int(device_id)] )
 
-#%%
+
 def make_log(log_dir, model_name, run_name):
     logfile = log_dir + model_name + "_{}.log".format(run_name)
     os.makedirs(os.path.dirname(logfile), exist_ok=True)
     return open(logfile, "a")
+
     
 def train_network(config, logfile=None):
     
@@ -334,31 +335,31 @@ def evaluate_network(config, logfile=None):
     if close_log:
         f_eval_log.close()
  
-#%%
+#
 # not actually used
-def run_all(c_ref, n, **kwargs): 
+# def run_all(c_ref, n, **kwargs): 
     
-    """
-    Parameters
-    ----------
-    c_ref : config class
-        reference config.
-    n : int
-        index of the config (n th config).
+#     """
+#     Parameters
+#     ----------
+#     c_ref : config class
+#         reference config.
+#     n : int
+#         index of the config (n th config).
         
-    kwargs :
-        verbose
-    -------
-    Set for one random config.
+#     kwargs :
+#         verbose
+#     -------
+#     Set for one random config.
 
-    """
+#     """
     
-    config = make_random_config(c_ref, n)
-    device_id = set_device(config)
-    sleep(15)
-    train_network(config, logfile=None)
-    evaluate_network(config, logfile=None)
-    change_gpu_exclude_ids(device_id, remove=True)
+#     config = make_random_config(c_ref, n)
+#     device_id = set_device(config)
+#     sleep(15)
+#     train_network(config, logfile=None)
+#     evaluate_network(config, logfile=None)
+#     change_gpu_exclude_ids(device_id, remove=True)
     
     
 def prepare_config(c_ref, n):
@@ -446,7 +447,8 @@ if __name__=='__main__':
     parser.add_argument('config_file', help="Run with specified config file as basis.")
     parser.add_argument('-s','--suffix', required=False, default=None, help="Output suffix")
     parser.add_argument('-o','--outputdir', required=False, default=None, help="Output directory")
-    parser.add_argument('-r','--resume', required=False, default=None, help="Resume Hyperparameter search or not (T/F)")
+    # parser.add_argument('-r','--resume', required=False, default=None, help="Resume Hyperparameter search or not (T/F)")
+    parser.add_argument('-r','--resume', required=False, default=False, action='store_true', help="Resume Hyperparameter search or not (T/F)")
     parser.add_argument('-n','--n_start', required=False, default=None, help="Start config from this numner (if resume=T)")
     
    
@@ -456,11 +458,12 @@ if __name__=='__main__':
         change_suffix(str(args.suffix) )
     if args.outputdir is not None:
         change_outputdir(str(args.outputdir) )
-    if args.resume is not None:
-        if args.resume == 'False' or args.resume=='0':
-            RESUME = False
-        if args.resume =='True' or args.resume=='1':
-            RESUME = True
+    # if args.resume is not None:
+    #     if args.resume == 'False' or args.resume=='0':
+    #         RESUME = False
+    #     if args.resume =='True' or args.resume=='1':
+    #         RESUME = True
+    RESUME = args.resume
             
     if RESUME==True and args.n_start is not None:
         N_start = int(args.n_start)
@@ -538,7 +541,7 @@ if __name__=='__main__':
         
                 
     # 2. Execute Loop : Train + Evaluation
-    sys.exit()
+    # sys.exit()
     t_start = time()
     t_mid = t_start
         

@@ -91,15 +91,18 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     eval_calib = True
     eval_RMSE = True
     eval_z = True
+    eval_u68 = True
     
     run_forward = False
     run_all_post = False
     run_all_map = False
+    run_all_u68 = False
     run_ind_post = False
     run_calib = False
     run_hist = False
     run_hist_map = False
     run_Ddist = False
+    
     
     if c.domain_adaptation: eval_Ddist = True  
     else: eval_Ddist=False
@@ -233,6 +236,24 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             run_ind_post = True
             run_calib = True
             
+    if eval_u68:
+        print("Request eval_u68")
+        filename_dic['u68'] = c.filename + tools.testfile_suffix['u68']
+        # for Specific lsig for Noise-Net
+        if c.prenoise_training==True and lsig_fix is not None:
+            # change filenames _{}
+            filename_dic['u68'] = filename_dic['u68'][:-4] + adding + filename_dic['u68'][-4:]
+            
+        if os.path.exists(filename_dic['u68']):
+            print("\tu68 data already exist. Do not need eval_u68.")
+            eval_u68 = False
+        else:
+            run_all_post = True
+            run_ind_post = True
+            run_all_u68 = True
+          
+       
+            
     if eval_Ddist: # only for domain adaptaion
         print("Request eval_Ddist")
         figurename_dic['Ddist'] = c.filename + tools.testfigure_suffix['Ddist']
@@ -245,6 +266,9 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     if run_all_map:
         run_ind_post = True
         run_all_post = True
+    if run_all_u68:
+        run_ind_post = True
+        run_all_post = True
     
     print()
     if run_forward:
@@ -255,6 +279,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         print('Need to run posteriors')
     if run_all_map:
         print('Need to calculate MAPs')
+    if run_all_u68:
+        print('Need to calculate u68s')
     if run_calib:
         print('Need to calculate calibrations')
     if run_hist:
@@ -315,7 +341,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         if VERBOSE:
             print("Saved Domain adaptaion test: D(c) distributions")
     
-    #%% 2) Run all: calib. RMSE, Histograms 
+    #%% 2) Run all: calib. RMSE, Histograms, MAP, u68
     # Setup general parameters for p(x) sampling
     # GROUP_SIZE: # n(obs) per one iteration
     n_group = np.ceil(len(param_test)/GROUP_SIZE).astype(int)
@@ -356,9 +382,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                  'n_grid':1024, 
                  'use_percentile': None,
                  'plot':False }
-    
-
-        
+   
     
     # Calibration setting
     # how many different confidences to look at
@@ -379,6 +403,10 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         
         if run_all_map:
             map_list = []
+            
+        if run_all_u68:
+            u68_list = [] # Nobs x Nparam 
+            prc68_list = [] # Nobs x Nparam x 2 (low, high)
             
         if run_hist:
             hist_dic = {}
@@ -463,11 +491,17 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                 inliers_group = uncert_intervals_group.copy()
                 xs_group = c.params_to_x(param_group)
             
-            if run_ind_post:
+            if run_ind_post: # analays for individual posterior: map, u68
                 for i_model, post in enumerate(post_list):
     
                     if run_all_map:
                         map_list.append( astro.exp.calculate_map(post,c, **map_kwarg ) )
+                        
+                    if run_all_u68:
+                        u, perc = astro.exp.calculate_uncertainty(post, c, confidence=68, percent=True, add_Teff=True, return_percentile=True)
+                        # add_Teff only works when logTeff is in x_names
+                        u68_list.append(u)
+                        prc68_list.append(perc)
     
                     # calib with x-scaled
                     if run_calib:
@@ -519,6 +553,10 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         # MAP 
         if run_all_map:
             map_list = np.array(map_list)
+            
+        if run_all_u68:
+            u68_list = np.array(u68_list)
+            prc68_list = np.array(prc68_list)
         
         # calib
         if run_calib:
@@ -629,6 +667,23 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         if not os.path.exists(filename_dic['calib']):
             ascii.write(calib_table, filename_dic['calib'], delimiter='\t', format='commented_header')
             print("Saved calib data file")
+            
+    if eval_u68:
+        if not os.path.exists(filename_dic['u68']):
+            if u68_list.shape[1] > c.x_dim:
+                if 'logTeff' in c.x_names: 
+                    table_param = c.x_names + ['Teff']
+            
+            u68_table = Table(u68_list, names=['u68_'+param for param in table_param])
+            # add lower and upper percitle value at 68 confidence
+            for i_param, param in enumerate(table_param):
+                u68_table['lp_'+param] = prc68_list[:,i_param,0]
+                u68_table['up_'+param] = prc68_list[:,i_param,1]
+            
+            ascii.write(u68_table, filename_dic['u68'], format='commented_header', delimiter='\t', overwrite=True)
+            print("Saved u68 file")
+           
+            
             
      #%% TvP all plot      
     if eval_TvP:
