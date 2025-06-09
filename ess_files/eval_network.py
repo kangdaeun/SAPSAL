@@ -673,6 +673,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             if u68_list.shape[1] > c.x_dim:
                 if 'logTeff' in c.x_names: 
                     table_param = c.x_names + ['Teff']
+            else:
+                table_param = c.x_names
             
             u68_table = Table(u68_list, names=['u68_'+param for param in table_param])
             # add lower and upper percitle value at 68 confidence
