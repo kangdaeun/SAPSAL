@@ -824,7 +824,7 @@ def random_lsig_seg_flux_uniform(flux, iseg_list, lsig_min0, lsig_max0, upper_li
     return lsig
 
 
-def divide_wl_segment(wl, start=1000, end=12000, seg_size=500, **kwarg):
+def divide_wl_segment(wl, seg_size=500, start=1000, end=12000,  **kwarg):
     """
     make wavelength segment for uncertainty sampling
     return list of indices
@@ -1064,12 +1064,16 @@ def calculate_map(parameter_distr, astro,
         
         # kde: only run when kde posteriors > 10% of input posteirors
         if np.sum(roi_kde) > 0.1*npost:
-            kde = FFTKDE(kernel='gaussian', bw=bw_method).fit(post[roi_kde])
-            
-            pmin, pmax = np.nanmin(post[roi_kde]), np.nanmax(post[roi_kde])
-            x_grid = np.linspace( pmin - (pmax-pmin)/(n_grid*2), pmax + (pmax-pmin)/(n_grid*2), n_grid)
-            y_grid = kde.evaluate(x_grid)
-            x_map = x_grid[np.argmax(y_grid)]
+            try:
+                kde = FFTKDE(kernel='gaussian', bw=bw_method).fit(post[roi_kde])
+                
+                pmin, pmax = np.nanmin(post[roi_kde]), np.nanmax(post[roi_kde])
+                x_grid = np.linspace( pmin - (pmax-pmin)/(n_grid*2), pmax + (pmax-pmin)/(n_grid*2), n_grid)
+                y_grid = kde.evaluate(x_grid)
+                x_map = x_grid[np.argmax(y_grid)]
+            except: # Exception as e:
+                x_map = np.nan
+                # print("[MAP error] )
         
         else:
             x_map = np.nan
