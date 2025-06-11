@@ -874,7 +874,16 @@ title_unit_dic = {
     'veil_r': r'r$_{\mathrm{veil}}$',
     'library': 'Library',
     "R_V": r'R$_{\mathrm{V}}$',
-
+    
+    
+    # slab parameters
+    'Tslab': r"T$_{\mathrm{slab}}$",
+    'log_ne': r"log n$_{\mathrm{e,slab}}$ (cm$^{-3}$)",
+    'ne': r"n$_{\mathrm{e,slab}}$ (cm$^{-3}$)",
+    
+    'log_tau0': r"log $\tau_{\mathrm{0,slab}}$",
+    'tau0': r"$\tau_{\mathrm{0,slab}}$",
+    'log_Fslab':r"log F$_{\mathrm{slab,norm}}$",
 }
 
 title_dic = {
@@ -885,6 +894,16 @@ title_dic = {
     'library': 'Library',
     'veil_r': r'r$_{\mathrm{veil}}$',
     "R_V": r'R$_{\mathrm{V}}$',
+    
+    # slab parameters
+    'Tslab': r"T$_{\mathrm{slab}}$",
+    'log_ne': r"log n$_{\mathrm{e,slab}}$",
+    'ne': r"n$_{\mathrm{e,slab}}$",
+    'log_tau0': r"log $\tau_{\mathrm{0,slab}}$",
+    'tau0': r"$\tau_{\mathrm{0,slab}}$",
+    'log_Fslab':r"log F$_{\mathrm{slab,norm}}$",
+    
+    
     
     'tT': r'T$_{\mathrm{eff}}^{\mathrm{True}}$',
     'mT': r'T$_{\mathrm{eff}}^{\mathrm{MAP}}$',
