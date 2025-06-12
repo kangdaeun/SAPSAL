@@ -1170,7 +1170,7 @@ import matplotlib.cm as cm
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 import copy
 
-def plot_posterior(posterior, axis, c, 
+def plot_posterior(posterior, axis, c, x_names = None,
                    x_true=None, plot_true=True, nbin=100, xranges_dic=None, return_xranges_dic=False,
                     color_post = 'gray', alpha=0.4, text_true=True,
                      map_values=None, plot_map=True, color_map='orange', text_map=True, 
@@ -1188,36 +1188,52 @@ def plot_posterior(posterior, axis, c,
         NxM, N: number of posterior estimates, M: number of parameters
     axis : matplotlib axis
     c : config class
+    x_names: if you want to only use some of the parmaeters. use this.
     Returns
     -------
     None.
 
     """
+    if x_names is not None:
+        # check dimension 
+        if posterior.shape[1] != len(x_names):
+            raise ValueError("posterior and x_names dimension mismatch")
+        param_names = x_names
+    else:
+        param_names = c.x_names.copy()
+        
+    n_param = len(param_names)
     
+    # check dimension 
+    if posterior.shape[1] != n_param:
+        raise ValueError("posterior and parameter dimension mismatch")
+    
+    
+    # Check availabily for options
     x_true_given = False
     if x_true is not None:
-        if len(x_true)==posterior.shape[1]:
+        if len(x_true)==n_param:
             x_true_given = True
     plot_true = plot_true*x_true_given
     text_true = text_true*x_true_given
         
     map_values_given = False
     if map_values is not None:
-        if len(map_values)==posterior.shape[1]:
+        if len(map_values)==n_param:
             map_values_given = True
     plot_map = plot_map*map_values_given
     text_map = text_map*map_values_given
   
     u68_given = False
     if u68_values is not None:
-        if len(u68_values)==posterior.shape[1]:
+        if len(u68_values)==n_param:
             u68_given = True
-        elif len(u68_values)==(posterior.shape[1]+1) and 'logTeff' in c.x_names:
+        elif len(u68_values)==(n_param+1) and 'logTeff' in param_names:
             u68_given = True
     if (u68_given is False):
         if calculate_u68*text_u68:
             u68_values = calculate_uncertainty(posterior, c, confidence=68, percent=True,
-                          add_Teff=bool('logTeff' in c.x_names) )
+                          add_Teff=bool('logTeff' in param_names) )
             u68_given = True
             
         else:
@@ -1227,7 +1243,7 @@ def plot_posterior(posterior, axis, c,
         xranges_dic = {}
     
 
-    for i_param, param in enumerate(c.x_names):
+    for i_param, param in enumerate(param_names):
         
         post = posterior[:, i_param].copy() # 1D
         if x_true_given:
@@ -1304,7 +1320,7 @@ def plot_posterior(posterior, axis, c,
               
             if text_u68:
                 txt.append('$u_{68}$=%#.4g'%(u68))
-                if param=='logTeff' and len(u68_values)==(posterior.shape[1]+1):
+                if param=='logTeff' and len(u68_values)==(n_param+1):
                     txt.append('(%.5g [K])'%( u68_values[-1]))
                     
                     
@@ -1328,11 +1344,25 @@ def plot_posterior(posterior, axis, c,
         return xranges_dic
         
         
-def overplot_posterior(posterior, axis, c, nbin=100, hratio=0.5, ls=':', color_post='C0', alpha=0.4,
+def overplot_posterior(posterior, axis, c, x_names = None,
+                       nbin=100, hratio=0.5, ls=':', color_post='C0', alpha=0.4,
                        xranges_dic=None,legend_label=None, plot_legend=True, legend_size='small', **kwarg):
     
+    if x_names is not None:
+        # check dimension 
+        if posterior.shape[1] != len(x_names):
+            raise ValueError("posterior and x_names dimension mismatch")
+        param_names = x_names
+    else:
+        param_names = c.x_names.copy()
+        
+    n_param = len(param_names)
+    
+    # check dimension 
+    if posterior.shape[1] != n_param:
+        raise ValueError("posterior and parameter dimension mismatch")
 
-    for i_param, param in enumerate(c.x_names):
+    for i_param, param in enumerate(param_names):
       
       post = posterior[:, i_param].copy() # 1D
             
