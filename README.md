@@ -2,7 +2,7 @@
 
 **SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with Neural Networks)** is a deep learning toolkit for analysing optical stellar spectra observed with VLT/MUSE using conditional invertible neural networks (cINNs). 
 
-From optical stellar spectra, SAPSAL networks give a full posterior distribution of stellar parameters (e.g. $$T_{\rm{eff}}$$, $$\rm{log} g$$,  $$A_{\rm{V}}$$,  $$r_{\rm{veil}}$$)
+SAPSAL networks give a full posterior distribution of stellar parameters (e.g. $$T_{\rm{eff}}$$, $$\rm{log} g$$,  $$A_{\rm{V}}$$,  $$r_{\rm{veil}}$$) from MUSE spectrum (4750 - 9350Å)
 
 This repository provides Python codes to build and run the SAPSAL networks introduced in the following papers:
 - [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html)
@@ -21,7 +21,7 @@ The following packages are required to run the scripts in this repository:
 | pandas   | >= 2.1.4 |
 | tqdm | >= 4.65.0 |
 | matplotlib | >= 3.8.0 |
-| GPUtil | >= 1.4.0 | not necessary, only for automatic GPU search and selection, <br> get [here](https://github.com/anderskm/gputil) |
+| GPUtil | >= 1.4.0 | not necessary, only for automatic CUDA GPU search and selection, <br> get [here](https://github.com/anderskm/gputil) |
 | KDEpy | >= 1.1.9 | for MAP calcuation, get [here](https://kdepy.readthedocs.io/en/latest/index.html) |
 | scipy | >= 1.11.4 |
 | astropy | >= 5.3.4 |
@@ -44,7 +44,7 @@ You can download pre-trained networks in networks/. Currently (2025. 06), there 
 | Stl_TGA_tpl | Teff, log g, Av (no veiling)  |  cINN trained only on BT-Settl, presented in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) <br>Trained on fixed Rv value of 4.4 |
 | SpD_TGARL_Noise_mMUSE  |  Teff, log g, Av, r_veil, library flag  | cINN presented in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) <br>Trained on BT-Settl and Dusty<br>Trained on fixed Rv value of 4.4|
 
-SpD_TGARL_Noise_mMUSE is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in prediction process so, for the input, it requires MUSE range spectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) across the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
+**SpD_TGARL_Noise_mMUSE** is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in prediction process (i.e. Noise-Net mode). THis network requires MUSE sectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) alomg the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
 
 In each network directory, you will find a configuration file (c_XXXX.py) and a zipped network (XXXX.pt.zip). First, unzip the network to get the network file (XXXX.pt). Please keep the configuration file and network file in the same directory (this is not necessary, but it makes reading the network a bit easier).
 
@@ -72,7 +72,7 @@ MUSE wavelength for the whole range:
 -->
 
 ## Citation
-If you use SAPSAL in your work, please cite the papers below.
+If you use SAPSAL networks in your work, please cite the papers below.
 - [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html)
 - [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html)
 - Kang et al. 2025b, _in prep._
