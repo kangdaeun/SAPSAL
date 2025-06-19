@@ -933,8 +933,8 @@ def get_title(key, unit=True):
 """
 Useful functions for analysis
 """
-def calculate_uncertainty(parameter_distr, astro, confidence=68, percent=True,
-                          add_Teff=False, spt_scale=None, return_percentile=False,
+def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True,
+                          add_Teff=False, spt_scale=None, return_percentile=False, add_veil=False,
                           ):
                           # exclude_infinite=True, exclude_unphysical=False, **kwarg):
     
@@ -965,8 +965,11 @@ def calculate_uncertainty(parameter_distr, astro, confidence=68, percent=True,
         confidence *= 1e-2
     
     if add_Teff:
-        if 'logTeff' not in astro.x_names:
+        if 'logTeff' not in c.x_names:
             add_Teff = False
+    if add_veil:
+        if 'log_veil_r' not in c.x_names:
+            add_veil = False
 
     unc_list = []
     per_list = []
@@ -974,19 +977,25 @@ def calculate_uncertainty(parameter_distr, astro, confidence=68, percent=True,
         q_low  = 100. * 0.5 * (1 - confidence)
         q_high = 100. * 0.5 * (1 + confidence)    
         
-        for i, param in enumerate(astro.x_names): 
+        for i, param in enumerate(c.x_names): 
             x_low, x_high = np.nanpercentile(parameter_distr[:, i], [q_low, q_high])
             unc_list.append(x_high - x_low)
             per_list.append([x_low, x_high])
             
         if add_Teff:
-            i_logTeff = astro.x_names.index('logTeff')
+            i_logTeff = c.x_names.index('logTeff')
             x_low, x_high = np.nanpercentile(parameter_distr[:, i_logTeff], [q_low, q_high])
             unc_list.append( 10**x_high - 10** x_low)
-            per_list.append([10** x_low, 10**x_high])
+            per_list.append([10**x_low, 10**x_high])
+            
+        if add_veil:
+            i_logr = c.x_names.index('log_veil_r')
+            x_low, x_high = np.nanpercentile(parameter_distr[:, i_logr], [q_low, q_high])
+            unc_list.append( 10**x_high - 10** x_low)
+            per_list.append([10**x_low, 10**x_high])
     else:
-        unc_list = [np.nan]*len(astro.x_names)
-        per_list = [[np.nan,np.nan]]*len(astro.x_names)
+        unc_list = [np.nan]*len(c.x_names)
+        per_list = [[np.nan,np.nan]]*len(c.x_names)
         if add_Teff:
             unc_list.append(np.nan)
             per_list.append([[np.nan,np.nan]])
@@ -1002,7 +1011,7 @@ def calculate_uncertainty(parameter_distr, astro, confidence=68, percent=True,
 
 
 # calculate_map, if plot=True, give simple horizontal figure
-def calculate_map(parameter_distr, astro, 
+def calculate_map(parameter_distr, c, 
                   bw_method = 'silverman', n_grid=1024, use_percentile = None,
                   exclude_unphysical=False, 
                   plot=False,  return_figure=False, plot_model = True, plot_map = True, plot_kde = True,
@@ -1050,8 +1059,8 @@ def calculate_map(parameter_distr, astro,
             
         # plot setting
         if not (nrow!=None and ncol!=None):
-            nrow = np.ceil(len(astro.x_names)/4).astype(int)
-            ncol = np.ceil(len(astro.x_names)/nrow).astype(int)
+            nrow = np.ceil(len(c.x_names)/4).astype(int)
+            ncol = np.ceil(len(c.x_names)/nrow).astype(int)
             figsize=[2.5*ncol, 3.5*nrow]
             
         fig, axis = plt.subplots(nrow, ncol, figsize=figsize)
@@ -1060,9 +1069,9 @@ def calculate_map(parameter_distr, astro,
         
     plot_index = 0
 
-    map_list = np.zeros(len(astro.x_names))
+    map_list = np.zeros(len(c.x_names))
     
-    for i_param, param in enumerate(astro.x_names):
+    for i_param, param in enumerate(c.x_names):
 
         post = parameter_distr[:, i_param].copy() # 1D
         
@@ -1175,6 +1184,7 @@ def plot_posterior(posterior, axis, c, x_names = None,
                     color_post = 'gray', alpha=0.4, text_true=True,
                      map_values=None, plot_map=True, color_map='orange', text_map=True, 
                      u68_values = None, calculate_u68=True,  text_u68=True, additional_text=None,
+                     text_label_true=r'$X^{\mathrm{True}}$', text_label_map=r'$X^{\mathrm{MAP}}$',
                      ylabelsize='medium', ylabel='Probability density', xlabelsize='large', 
                      yticklabelsize='medium',xticklabelsize='large',
                      txtsize='small', title_unit=True,
@@ -1300,9 +1310,9 @@ def plot_posterior(posterior, axis, c, x_names = None,
                 
             if plot_true:
                 if np.isfinite(true_val):
-                    ax.axvline(x=true_val, color='r', ls='-', label=r'$X^{\mathrm{True}}$=%#.4g'%(true_val))
+                    ax.axvline(x=true_val, color='r', ls='-') # label="%s=%#.4g"%(legend_label_true, true_val))
             if plot_map:
-                ax.axvline(x=x_map, color=color_map, ls='--',)
+                ax.axvline(x=x_map, color=color_map, ls='--')#  label="%s=%#.4g"%(legend_label_map, x_map))
             
             if xrange is not None:
                 ax.set_xlim(xlim)
@@ -1310,11 +1320,11 @@ def plot_posterior(posterior, axis, c, x_names = None,
             txt = []
             if text_true:
                 if np.isfinite(true_val):
-                    txt.append(r'$X^{\mathrm{True}}$=%#.4g'%(true_val))
+                    txt.append("%s=%#.4g"%(text_label_true, true_val))
                     if param=='logTeff':
                         txt.append('(%.5g [K])'%10**x_true[i_param])
             if text_map:
-                txt.append( r'$X^{\mathrm{MAP}}$=%#.4g'%(x_map)     )
+                txt.append( "%s=%#.4g"%(text_label_map, x_map))
                 if param=='logTeff':
                     txt.append('(%.5g [K])'%10**x_map)
               

@@ -195,12 +195,20 @@ class DataLoader(cINNConfig):
         spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
         if veil_flux:
             wl = self.exp.get_muse_wl()[spec_indices]
+            if 'veil_r' in x_names:
+                veil_values = all_param[:, x_names.index("veil_r")]
+            elif 'log_veil_r' in x_names:
+                veil_values =  10**all_param[:, x_names.index("log_veil_r")]
+            else:
+                raise ValueError("Cannot veil: neither veil_r nor log_veil_r is in x_names.")
+            
+            
             # ordinary constant veilnig if use_Hslab_veiling is not True
             if self.use_Hslab_veiling:
                 # not a grid of model but just one
                 if self.use_one_Hslab_model==True: 
                     fslab_norm = self.exp.read_example_slab()[spec_indices]
-                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:, spec_locs], veil=all_param[:, x_names.index("veil_r")], fslab_750=fslab_norm)
+                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:, spec_locs], veil=veil_values, fslab_750=fslab_norm)
                 elif self.slab_grid is not None:
                     # This will make fslab_norm only for corresponding y_names and add slab parameters to predict based on x_names
                     # fslab_norm have N_model x N(spec_locs)
@@ -208,11 +216,11 @@ class DataLoader(cINNConfig):
                     # possible slab parameters = ['Tslab', 'log_ne', 'log_tau0', 'log_Fslab']
                     all_param, fslab_norm = self.exp.assign_slab_grid(self.slab_grid, all_param, x_names, y_names, random_seed=random_seed)
                     # add veiling effect
-                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=all_param[:, x_names.index("veil_r")], fslab_750=fslab_norm)
+                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=veil_values, fslab_750=fslab_norm)
                 else:
                     raise ValueError("Invalid configuration: use_Hslab_veiling=True & use_one_slab_grid!=True, but slab_grid is not specified.")
             else:
-                all_obs[:, spec_locs] = self.exp.add_veil(wl, all_obs[:, spec_locs], veil=all_param[:, x_names.index("veil_r")] )
+                all_obs[:, spec_locs] = self.exp.add_veil(wl, all_obs[:, spec_locs], veil=veil_values)
         
         # 2) Add extinction
         if extinct_flux:
