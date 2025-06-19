@@ -261,7 +261,7 @@ class DataLoader(cINNConfig):
         veil_flux = False
         extinct_flux = False
         if self.random_parameters is not None:
-            if "veil_r" in self.random_parameters.keys():
+            if "veil_r" in self.random_parameters.keys() or 'log_veil_r' in self.random_parameters.keys():
                 veil_flux = True
             if "A_V" in self.random_parameters.keys():
                 extinct_flux = True
@@ -384,7 +384,7 @@ class DataLoader(cINNConfig):
         veil_flux = False
         extinct_flux = False
         if self.random_parameters is not None:
-            if "veil_r" in self.random_parameters.keys():
+            if "veil_r" in self.random_parameters.keys() or 'log_veil_r' in self.random_parameters.keys():
                 veil_flux = True
             if "A_V" in self.random_parameters.keys():
                 extinct_flux = True
