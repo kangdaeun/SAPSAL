@@ -36,9 +36,32 @@ The following packages are required to run the scripts in this repository:
 
 
 ## How to use pre-trained networks
-To write
-- a list of neural networks available + relevant citation
-- tutorial codes: Prediction (load network, predict, MAP, plots)
+
+You can download pre-trained networks in networks/. Currently (2025. 06), there are two networks available.
+
+| Network name | Parameters to predict | Comments |
+|---------|---------|---------|
+| Stl_TGA_tpl | Teff, log g, Av (no veiling)  |  cINN trained only on BT-Settl, presented in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) <br>Trained on fixed Rv value of 4.4 |
+| SpD_TGARL_Noise_mMUSE  |  Teff, log g, Av, r_veil, library flag  | cINN presented in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) <br>Trained on BT-Settl and Dusty<br>Trained on fixed Rv value of 4.4|
+
+SpD_TGARL_Noise_mMUSE is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in prediction process so, for the input, it requires MUSE range spectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) across the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
+
+In each network directory, you will find a configuration file (c_XXXX.py) and a zipped network (XXXX.pt.zip). First, unzip the network to get the network file (XXXX.pt). Please keep the configuration file and network file in the same directory (this is not necessary, but it makes reading the network a bit easier).
+
+You can find the jupyter notebook (Tutorial.ipynb) in examples/, which explains
+- how to read the network
+- how to prepare input data from your observations
+- how to run the network and make predictions
+- how to use useful functions in expander.py to calculate MAP estimates, plot posterior distributions, etc.
+
+### MUSE wavelength
+Networks are designed for the VLT/MUSE spectrum. We masked some spectral bins in the network to avoid emission lines, but used most of the spectral bins. You can find out how to filter out unnecessary spectral bins in Tutorial.ipynb.
+
+MUSE wavelength for the whole range:
+> np.arange(4750.1572265625, 9351.4072265625, 1.25)
+
+
+  
 
 
 <!--
