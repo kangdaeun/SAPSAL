@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="SAPSAL_logo_1.png" alt="SAPSAL Logo" width="250"/>
+</p>
+
 # SAPSAL
 
 **SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with Neural Networks)** is a deep learning toolkit for analysing optical stellar spectra observed with VLT/MUSE using conditional invertible neural networks (cINNs). 
