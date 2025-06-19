@@ -478,6 +478,7 @@ if __name__=='__main__':
    # Create output directory if it does not exist
     if not os.path.exists(OUTPUT_DIR):
         os.makedirs(OUTPUT_DIR)
+        RESUME=False
 
     # Create subfolder for the configs if it does not exist
     if not os.path.exists(OUTPUT_DIR + "configs/"):
@@ -501,6 +502,7 @@ if __name__=='__main__':
     if RESUME:
         # check configfiles saved
         n_saved = len(glob.glob(OUTPUT_DIR + "configs/c_*.py"))
+       
         # check updated configs
         config_df = read_config_table()
         if config_df is False:
