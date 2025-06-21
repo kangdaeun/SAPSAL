@@ -64,7 +64,7 @@ def load_data_for_situation(astro, smoothing=False, random_seed=0):
     veil_flux = False
     extinct_flux = False
     if astro.random_parameters is not None:
-        if "veil_r" in astro.random_parameters.keys():
+        if "veil_r" in astro.random_parameters.keys() or 'log_veil_r' in astro.random_parameters.keys():
             veil_flux = True
         if "A_V" in astro.random_parameters.keys():
             extinct_flux = True

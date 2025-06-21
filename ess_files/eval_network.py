@@ -299,7 +299,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     veil_flux = False
     extinct_flux = False
     if astro.random_parameters is not None:
-        if "veil_r" in astro.random_parameters.keys():
+        if "veil_r" in astro.random_parameters.keys() or 'log_veil_r' in astro.random_parameters.keys():
             veil_flux = True
         if "A_V" in astro.random_parameters.keys():
             extinct_flux = True
@@ -792,15 +792,16 @@ if __name__=='__main__':
         c.device = device
         
     if 'cuda' in c.device:
-        import GPUtil
-        DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
-                                                  maxMemory=GPU_MAX_MEMORY,
-                                                  attempts=GPU_ATTEMPTS,
-                                                  interval=GPU_WAIT_S,
-                                                  excludeID=GPU_EXCLUDE_IDS,
-                                                  verbose=VERBOSE)
-        DEVICE_ID = DEVICE_ID_LIST[0]
-        c.device = 'cuda:{:d}'.format(DEVICE_ID)
+        if 'cuda:' not in c.device:
+            import GPUtil
+            DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
+                                                      maxMemory=GPU_MAX_MEMORY,
+                                                      attempts=GPU_ATTEMPTS,
+                                                      interval=GPU_WAIT_S,
+                                                      excludeID=GPU_EXCLUDE_IDS,
+                                                      verbose=VERBOSE)
+            DEVICE_ID = DEVICE_ID_LIST[0]
+            c.device = 'cuda:{:d}'.format(DEVICE_ID)
     
     elif 'mps' in c.device: # request to use MAC GPU
         # CPU will be used if MPS is not available, assuming you are running on MAC
