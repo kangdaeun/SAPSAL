@@ -718,7 +718,7 @@ class cINNConfig():
         
         def format_list(name, items, max_items_per_line=10):
             if len(items) <= max_items_per_line:
-                return f"{name} = [\n\t" + "',\n\t'".join(items) + "'\n]"
+                return f"{name} = [\n\t'" + "',\n\t'".join(items) + "'\n]"
             else:
                 lines = []
                 for i in range(0, len(items), max_items_per_line):
