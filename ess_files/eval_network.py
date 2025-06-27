@@ -349,8 +349,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     
     # eval_TvP:
     hist_range_dic = {}
-    for i_param, param in enumerate(astro.x_names):
-        xrange = [np.min(test_set[0][:,i_param]), np.max(test_set[0][:,i_param])]
+    for i_param, param in enumerate(c.x_names):
+        xrange = [np.min(param_test[:,i_param]), np.max(param_test[:,i_param])]
         yrange = xrange
         hist_range_dic[param] = (xrange, yrange)
     

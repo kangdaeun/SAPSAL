@@ -22,6 +22,7 @@ import pandas
 from scipy.special import erfinv
 import copy
 from .train_tools import check_divergence, check_convergence
+
 import warnings
 # warnings.filterwarnings("ignore", category=UserWarning)
 
