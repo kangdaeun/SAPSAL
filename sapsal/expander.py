@@ -224,8 +224,6 @@ def cardelli_extinction(wave, Av, Rv):
 
     
 
-
-
 def extinct_spectrum(wl, flux, Av_array, Rv_array):
     """
     wl must be 1D array
@@ -257,6 +255,41 @@ def extinct_spectrum(wl, flux, Av_array, Rv_array):
         
         for i in range(flux.shape[0]):
             flux[i, :] = flux[i, :] * cardelli_extinction(wl, Av_array[i], Rv_array[i])
+        
+        return flux
+    
+
+def deredden_spectrum(wl, flux, Av_array, Rv_array):
+    """
+    wl must be 1D array
+    Av_array and Rv_array can be one value or 1D array, in that case, flux should 1D, 2D respectively
+    
+    """
+    
+    single_data = True
+    multi_Rv = False; multi_Av=False
+    # check dimension of given Av and Rv
+    
+    if len(np.array(Rv_array).shape)==1 and np.array(Rv_array).shape[0] == np.array(flux).shape[0]:
+        multi_Rv = True
+        single_data = False
+   
+    if len(np.array(Av_array).shape)==1 and np.array(Av_array).shape[0] == np.array(flux).shape[0]:
+        multi_Av = True
+        single_data = False
+       
+        
+    if single_data:
+        return flux / cardelli_extinction(wl, Av_array, Rv_array)
+    
+    else:
+        if not multi_Av:
+            Av_array = np.repeat(Av_array, flux.shape[0])
+        if not multi_Rv:
+            Rv_array = np.repeat(Rv_array, flux.shape[0])
+        
+        for i in range(flux.shape[0]):
+            flux[i, :] = flux[i, :] / cardelli_extinction(wl, Av_array[i], Rv_array[i])
         
         return flux
 
@@ -330,11 +363,12 @@ def add_veil(wl, fl, veil):
     return fl
 
 # HSlab veiling 
-def add_slab_veil(wl, fl, veil, fslab_750):
+def add_slab_veil(wl, fl, veil, fslab_750, return_veil=False):
+    
     f750 = get_f750(wl, fl)
     # for only one spectrum
     if fl.ndim == 1:
-        fl = fl + veil * fslab_750 * f750
+        veiling = veil * fslab_750 * f750
     
     elif fl.ndim == 2: # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
         # one slab or different slabs
@@ -342,12 +376,47 @@ def add_slab_veil(wl, fl, veil, fslab_750):
         #     fslab_750 = np.repeat(fslab_750.reshape(1,-1), fl.shape[0], axis=0)
         if len(veil)==fl.shape[0]:
             # fl = fl + ((veil * f750).reshape(-1,1) )*fslab_750
-            fl = fl + (veil * f750)[:, None] * fslab_750
+            veiling = (veil * f750)[:, None] * fslab_750  
         else:
             ValueError("len(veil)!=N_obs")
     else:
         raise ValueError("fl must be 1D or 2D numpy array")
-    return fl
+    
+    fl = fl + veiling
+
+    if return_veil:
+        return fl, veiling
+    else:
+        return fl
+    
+
+def remove_veil(wl, fl, veil, fslab_norm = None, return_veil=False):
+    
+    f750 = exp.get_f750(wl, fl)
+
+    # for only one spectrum
+    if fl.ndim == 1:
+        if fslab_norm is None:
+            veiling = veil*f750/(1+veil)
+        else:
+            veiling = veil / (1+veil) * fslab_norm * f750
+        
+    elif fl.ndim == 2: # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
+        if len(veil)==fl.shape[0]:
+            if fslab_norm is None:
+                veiling = veil / (1+veil) * f750.reshape(-1,1)
+            else:
+                veiling = (veil / (1+veil) * f750)[:, None] * fslab_750
+        else:
+            ValueError("len(veil)!=N_obs")
+    else:
+        raise ValueError("fl must be 1D or 2D numpy array")
+    
+    fl = fl - veiling
+    if return_veil:
+        return fl, veiling
+    else:
+        return fl
 
 # read already saved one slab
 def read_example_slab():
@@ -1508,3 +1577,55 @@ def scatter_color(fig, ax, xval, yval, cval, sval=40, plot_cbar=True,
 
     if return_ims:
         return ims
+
+
+
+
+def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_norm,
+                             distance, distance_err, final_unit):
+    """
+    
+    Calculate log Lacc posterior for one observation. 
+    Use Monte Carlo for distance and flux
+    Give 1-sigma distance error and flux errors for each spectral bins
+    
+    Do not pass too long spectrum.
+    Parameters
+    ----------
+    wl : wavelength only for range needed to calculate F750 (AA)
+    y_obs : flux only for range needed to calculate F750 (physical unit)
+    y_err : flux error only for range needed to calculate F750 (physical unit)
+       
+    Av_values : 1D array of Av from posterior 
+    Rv_values : 1D array of Rv, if using just one Rv, give np.array([Rv])
+    r_values : 1D array of veil_r from posterior     
+    Fslab_norm : 1D array of veil_r from posterior (linear scale). normalized. no unit
+    distance : distance to target . for units, use final_unit 
+    distance_err : distance error (same unit as distance)
+    final_unit : final unit for Lacc (linear) : usuallyl kpc*kpc/Lsun in cgs
+        DESCRIPTION.
+
+    Returns
+    -------
+    result : Lacc_post (in linear scale)
+
+    """
+    
+             
+    # Setup Monte Carlo varaibles (not in posterior but have 1 sigma error)
+    N_mc = len(Av_values)
+    # distance, flux
+    dist_mc = np.random.normal(distance, distance_err, size=N_mc)
+    y_mc = np.random.normal(loc=y_obs, scale=y_err, size=(N_mc, len(y_obs)))
+
+    # deredden spectra 
+    y_drd = deredden_spectrum(wl, y_mc, Av_values, Rv_values)
+    f750 = get_f750(wl, y_drd) # f750 for MC/posterior cases (from dereddend)
+    F_acc_post = r_values / (1+r_values) * f750 * Fslab_norm #* units.erg / units.cm / units.cm / units.s # erg/cm2/s
+
+    # L_acc_post = ( 4*np.pi* (dist_mc*distance_unit)**2 * F_acc_post).to(units.erg/units.s) 
+    # L_acc_post = ( L_acc_post / cst.L_sun.to(units.erg/units.s)).value # in Lsun unit
+    L_acc_post = ( 4*np.pi* (dist_mc)**2 * F_acc_post) * final_unit
+    
+    
+    return L_acc_post
