@@ -194,9 +194,15 @@ def cardelli_extinction(wave, Av, Rv):
     # If you use it to apply a reddening to a spectrum, multiply it for the result of
     # this function, while you should divide by it in the case you want to deredden it.
     
-    # here Av and Rv should be scalr values
+    # here Av and Rv should be scalr values -> 2025.07.13: changed. Av and Rv can be scalar or 1D array.
 
     #ebv = Av/Rv
+
+    Av_arr = np.atleast_1d(Av)
+    Rv_arr = np.atleast_1d(Rv)
+    if Av_arr.shape != Rv_arr.shape:
+        raise ValueError("Av and Rv should have the same length.")
+    npts_avrv = len(Av_arr)
 
     x = 10000./ wave # Convert to inverse microns (wave is in Anstrom)
     npts = len(x)
@@ -205,28 +211,35 @@ def cardelli_extinction(wave, Av, Rv):
     # extinction valid range: upto 3.3333 um, down to 3030A
     #******************************
 
-    good = (x > 0.3) & (x < 1.1) #Infrared: 9090.90 A ~ 3.3333um
-    Ngood = np.count_nonzero(good == True)
-    if Ngood > 0:
-        a[good] = 0.574 * x[good]**(1.61) # from Cardelli+1989
-        b[good] = -0.527 * x[good]**(1.61)
+    good_ir = (x > 0.3) & (x < 1.1) #Infrared: 9090.90 A ~ 3.3333um
+    # Ngood = np.count_nonzero(good == True)
+    # if Ngood > 0:
+    if np.any(good_ir):
+        a[good_ir] = 0.574 * x[good_ir]**(1.61) # from Cardelli+1989
+        b[good_ir] = -0.527 * x[good_ir]**(1.61)
 
     #****************************** 
-    good = (x >= 1.1) & (x < 3.3) #Optical/NIR: 3030.30A ~ 9090.90A
-    Ngood = np.count_nonzero(good == True)
-    if Ngood > 0: #Use new constants from O'Donnell (1994)
-        y = x[good] - 1.82
+    good_opt_nir = (x >= 1.1) & (x < 3.3) #Optical/NIR: 3030.30A ~ 9090.90A
+    # Ngood = np.count_nonzero(good == True)
+    # if Ngood > 0: #Use new constants from O'Donnell (1994)
+    if np.any(good_opt_nir):
+        y = x[good_opt_nir] - 1.82
         c1 = [-0.505, 1.647, -0.827, -1.718, 1.137, 0.701, -0.609, 0.104, 1.0] #New coefficients
         c2 = [3.347, -10.805, 5.491, 11.102, -7.985, -3.989, 2.908, 1.952, 0.0] #from O'Donnell (1994)
 
-        a[good] = np.polyval(c1,y)
-        b[good] = np.polyval(c2,y)
+        a[good_opt_nir] = np.polyval(c1,y)
+        b[good_opt_nir] = np.polyval(c2,y)
 
-    A_lambda = Av * (a + b/Rv) # dim(a) = dim(wave), so in this case, 
+    
+    # A_lambda = Av * (a + b/Rv) # dim(a) = dim(wave), so in this case, 
+    A_lambda = Av_arr[:, np.newaxis] * (a[np.newaxis, :] + b[np.newaxis, :] / Rv_arr[:, np.newaxis])
 
     ratio = 10.**(-0.4*A_lambda)
 
-    return ratio # dim(ratio) = dim(wave)
+    if npts_avrv == 1:
+        return ratio.flatten()
+    else:
+        return ratio # dim(ratio) = dim(wave)
 
     
 
@@ -236,33 +249,78 @@ def extinct_spectrum(wl, flux, Av_array, Rv_array):
     Av_array and Rv_array can be one value or 1D array, in that case, flux should 1D, 2D respectively
     
     """
+
+    if wl.ndim != 1:
+        raise ValueError("wl must be 1D array")
     
-    single_data = True
-    multi_Rv = False; multi_Av=False
-    # check dimension of given Av and Rv
+    # check dimension of flux: one spectrum or multiple spectra
+    is_flux_1d = (flux.ndim == 1)
+    if is_flux_1d:
+        M = 1 # one spectrum
+        N = flux.shape[0]
+        flux_processed = flux[np.newaxis, :]
+    else:
+        M = flux.shape[0] # multiple spectra
+        N = flux.shape[1]
+        flux_processed = flux 
     
-    if len(np.array(Rv_array).shape)==1 and np.array(Rv_array).shape[0] == np.array(flux).shape[0]:
-        multi_Rv = True
-        single_data = False
+    # Av and Rv can be scalar or 1D array (1 or M)
+    Av_arr_processed = np.atleast_1d(Av_array)
+    Rv_arr_processed = np.atleast_1d(Rv_array)
+
+    # Av_array 
+    if Av_arr_processed.size == 1: # scalr or 1 value array
+        # if Av_array 1 value -> repeat 
+        Av_for_cardelli = np.repeat(Av_arr_processed.item(), M)
+    elif Av_arr_processed.size == M: # all different Av
+        Av_for_cardelli = Av_arr_processed
+    else:
+        raise ValueError("Av_array should be scalar, 1D array with either one value or M values=number of spectra")
+    # Rv_array 
+    if Rv_arr_processed.size == 1: # scalr or 1 value array
+        Rv_for_cardelli = np.repeat(Rv_arr_processed.item(), M)
+    elif Rv_arr_processed.size == M: # all different Rv 
+        Rv_for_cardelli = Rv_arr_processed
+    else:
+        raise ValueError("Rv_array should be scalar, 1D array with either one value or M values=number of spectra")
+    
+    # Av_for_cardelli and Rv_for_cardelli : 1xM 1D array, the same length
+    extinction_ratio = cardelli_extinction(wl, Av_for_cardelli, Rv_for_cardelli) # (M, N) 2D array or if Av and Rv are all 1 values, (1,N) 1D array
+    # flux_processed: 2D array (1,N) or (M, N)
+    extincted_flux = flux_processed * extinction_ratio
+
+    if is_flux_1d:
+        return extincted_flux.flatten()
+    else:
+        return extincted_flux
+
+    # single_data = True
+    # multi_Rv = False; multi_Av=False
+    # # check dimension of given Av and Rv
+    
+
+    # if len(np.array(Rv_array).shape)==1 and np.array(Rv_array).shape[0] == np.array(flux).shape[0]:
+    #     multi_Rv = True
+    #     single_data = False
    
-    if len(np.array(Av_array).shape)==1 and np.array(Av_array).shape[0] == np.array(flux).shape[0]:
-        multi_Av = True
-        single_data = False
+    # if len(np.array(Av_array).shape)==1 and np.array(Av_array).shape[0] == np.array(flux).shape[0]:
+    #     multi_Av = True
+    #     single_data = False
        
         
-    if single_data:
-        return flux * cardelli_extinction(wl, Av_array, Rv_array)
+    # if single_data:
+    #     return flux * cardelli_extinction(wl, Av_array, Rv_array)
     
-    else:
-        if not multi_Av:
-            Av_array = np.repeat(Av_array, flux.shape[0])
-        if not multi_Rv:
-            Rv_array = np.repeat(Rv_array, flux.shape[0])
+    # else:
+    #     if not multi_Av:
+    #         Av_array = np.repeat(Av_array, flux.shape[0])
+    #     if not multi_Rv:
+    #         Rv_array = np.repeat(Rv_array, flux.shape[0])
         
-        for i in range(flux.shape[0]):
-            flux[i, :] = flux[i, :] * cardelli_extinction(wl, Av_array[i], Rv_array[i])
+    #     for i in range(flux.shape[0]):
+    #         flux[i, :] = flux[i, :] * cardelli_extinction(wl, Av_array[i], Rv_array[i])
         
-        return flux
+    #     return flux
     
 
 def deredden_spectrum(wl, flux, Av_array, Rv_array):
@@ -271,33 +329,77 @@ def deredden_spectrum(wl, flux, Av_array, Rv_array):
     Av_array and Rv_array can be one value or 1D array, in that case, flux should 1D, 2D respectively
     
     """
+    if wl.ndim != 1:
+        raise ValueError("wl must be 1D array")
     
-    single_data = True
-    multi_Rv = False; multi_Av=False
-    # check dimension of given Av and Rv
+    # check dimension of flux: one spectrum or multiple spectra
+    is_flux_1d = (flux.ndim == 1)
+    if is_flux_1d:
+        M = 1 # one spectrum
+        N = flux.shape[0]
+        flux_processed = flux[np.newaxis, :]
+    else:
+        M = flux.shape[0] # multiple spectra
+        N = flux.shape[1]
+        flux_processed = flux 
     
-    if len(np.array(Rv_array).shape)==1 and np.array(Rv_array).shape[0] == np.array(flux).shape[0]:
-        multi_Rv = True
-        single_data = False
+    # Av and Rv can be scalar or 1D array (1 or M)
+    Av_arr_processed = np.atleast_1d(Av_array)
+    Rv_arr_processed = np.atleast_1d(Rv_array)
+
+    # Av_array 
+    if Av_arr_processed.size == 1: # scalr or 1 value array
+        # if Av_array 1 value -> repeat 
+        Av_for_cardelli = np.repeat(Av_arr_processed.item(), M)
+    elif Av_arr_processed.size == M: # all different Av
+        Av_for_cardelli = Av_arr_processed
+    else:
+        raise ValueError("Av_array should be scalar, 1D array with either one value or M values=number of spectra")
+    # Rv_array 
+    if Rv_arr_processed.size == 1: # scalr or 1 value array
+        Rv_for_cardelli = np.repeat(Rv_arr_processed.item(), M)
+    elif Rv_arr_processed.size == M: # all different Rv 
+        Rv_for_cardelli = Rv_arr_processed
+    else:
+        raise ValueError("Rv_array should be scalar, 1D array with either one value or M values=number of spectra")
+    
+    # Av_for_cardelli and Rv_for_cardelli : 1xM 1D array, the same length
+    extinction_ratio = cardelli_extinction(wl, Av_for_cardelli, Rv_for_cardelli) # (M, N) 2D array or if Av and Rv are all 1 values, (1,N) 1D array
+    # flux_processed: 2D array (1,N) or (M, N)
+    dereddened_flux = flux_processed / extinction_ratio
+
+    if is_flux_1d:
+        return dereddened_flux.flatten()
+    else:
+        return dereddened_flux
+
+    
+    # single_data = True
+    # multi_Rv = False; multi_Av=False
+    # # check dimension of given Av and Rv
+
+    # if len(np.array(Rv_array).shape)==1 and np.array(Rv_array).shape[0] == np.array(flux).shape[0]:
+    #     multi_Rv = True
+    #     single_data = False
    
-    if len(np.array(Av_array).shape)==1 and np.array(Av_array).shape[0] == np.array(flux).shape[0]:
-        multi_Av = True
-        single_data = False
+    # if len(np.array(Av_array).shape)==1 and np.array(Av_array).shape[0] == np.array(flux).shape[0]:
+    #     multi_Av = True
+    #     single_data = False
        
         
-    if single_data:
-        return flux / cardelli_extinction(wl, Av_array, Rv_array)
+    # if single_data:
+    #     return flux / cardelli_extinction(wl, Av_array, Rv_array)
     
-    else:
-        if not multi_Av:
-            Av_array = np.repeat(Av_array, flux.shape[0])
-        if not multi_Rv:
-            Rv_array = np.repeat(Rv_array, flux.shape[0])
+    # else:
+    #     if not multi_Av:
+    #         Av_array = np.repeat(Av_array, flux.shape[0])
+    #     if not multi_Rv:
+    #         Rv_array = np.repeat(Rv_array, flux.shape[0])
         
-        for i in range(flux.shape[0]):
-            flux[i, :] = flux[i, :] / cardelli_extinction(wl, Av_array[i], Rv_array[i])
+    #     for i in range(flux.shape[0]):
+    #         flux[i, :] = flux[i, :] / cardelli_extinction(wl, Av_array[i], Rv_array[i])
         
-        return flux
+    #     return flux
 
 
 
