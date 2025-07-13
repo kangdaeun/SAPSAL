@@ -5,6 +5,7 @@ import matplotlib.ticker as ticker
 import sys
 import os
 from astropy.io import ascii
+from pathlib import Path
 if sys.version_info >= (3, 9):
     import importlib.resources as resources
 else:
@@ -15,7 +16,12 @@ else:
 
 def read_database(tablename):
     
-    whole_table = pd.read_csv(tablename)
+    file_path = Path(tablename)
+    extension = file_path.suffix.lower()
+    if extension == '.parquet':
+        whole_table = pd.read_parquet(tablename)
+    else:
+        whole_table = pd.read_csv(tablename)
     # whole_table = pd.read_csv('ecogal_spectra_training_data.csv')
     # whole_table = ascii.read( tablename, delimiter="\t", format="commented_header")    
     return whole_table
@@ -406,7 +412,7 @@ def remove_veil(wl, fl, veil, fslab_norm = None, return_veil=False):
             if fslab_norm is None:
                 veiling = veil / (1+veil) * f750.reshape(-1,1)
             else:
-                veiling = (veil / (1+veil) * f750)[:, None] * fslab_750
+                veiling = (veil / (1+veil) * f750)[:, None] * fslab_norm
         else:
             ValueError("len(veil)!=N_obs")
     else:
