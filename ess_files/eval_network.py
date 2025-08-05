@@ -75,7 +75,7 @@ VERBOSE = True           # Switch for progress messages
 
 LOG_MODE = True     # Print both console and log # this does not set to save log!
 
-
+MAX_ATTEMPT = 5     # Maximum attempt of evaluation, if error occurs due to CUDA out of memory
 
 
 ##########
@@ -727,6 +727,9 @@ if __name__=='__main__':
     parser.add_argument('-l','--lsig', required=False, default=None, help="Const log (sigma) or random for Noise-Net evaluation. If this is set, the filenames change.")
     parser.add_argument('-g', '--group_size', type=int, default=GROUP_SIZE, help="# of obs per one posterior processing (Default=400)")
     parser.add_argument('-L','--log', required=False, default=True, help="Save logfile T/F")
+    parser.add_argument('-c', '--check', required=False, default=False, action='store_true', help="Check training status before running (T/F)")
+    
+    
     
     args = parser.parse_args()
     
@@ -738,6 +741,7 @@ if __name__=='__main__':
         savelog = True
     
     GROUP_SIZE = args.group_size
+    check_status = args.check
         
     # if savelog:
     #     logfile = os.path.basename(args.config_file).replace('.py','_evaluation.log').replace('c_','')
@@ -747,7 +751,19 @@ if __name__=='__main__':
     config_file = args.config_file
         
     c = read_config_from_file(config_file)
-    
+
+    # If check_status=True: check training status. If network is diverged, do not run any evaluation.
+    if check_status==True:
+        if tools.check_train_status(c)!=True: # this check .pt file, loss file, loss figure file. to check trainig is done. != True:
+            print("Network is not yet trained. Pass evaluation (%s)"%os.path.basename(c.config_file))
+            sys.exit()
+        elif tools.check_training_status(c)==-1: # this check convergence and divergence of loss. -1 means diverged
+            print("Network diverged. Pass evaluation (%s)"%os.path.basename(c.config_file))
+            sys.exit()
+        
+        if tools.check_eval_status(c) == True: # already done basic evaluation
+            print("Alreay done evaluation (%s)"%os.path.basename(c.config_file) )
+            sys.exit()
   
         
     # for Noise-Net, if specific lsig is set
@@ -824,7 +840,34 @@ if __name__=='__main__':
     print("===========================================================")
     
     
-    evaluate(c, astro=astro, lsig_fix=lsig_set)
+    for attempt in range(MAX_ATTEMPT):
+        try:
+            print(f"[Attempt {attempt+1}]: evaluation of {c.config_file}")
+            evaluate(c, astro=astro, lsig_fix=lsig_set)
+            break  # escape loop if succeed
+        except RuntimeError as e:
+            if "CUDA out of memory" in str(e):
+                print(f"[{c.device}] CUDA OOM error. Find device again.")
+                torch.cuda.empty_cache()
+                DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
+                                                          maxMemory=GPU_MAX_MEMORY,
+                                                          attempts=GPU_ATTEMPTS,
+                                                          interval=GPU_WAIT_S,
+                                                          excludeID=GPU_EXCLUDE_IDS,
+                                                          verbose=VERBOSE)
+                DEVICE_ID = DEVICE_ID_LIST[0]
+                c.device = 'cuda:{:d}'.format(DEVICE_ID)
+                astro.device = c.device
+            else:
+                print(str(e))
+                raise
+        except Exception as e:      
+            print(str(e))
+            raise
+    else:
+        # MAX_ATTEMPT 횟수 내에 성공하지 못했을 경우
+        raise RuntimeError(f"Evaluation failed after {MAX_ATTEMPT} attempts due to repeated CUDA OOM.")
+        
     print("Finished evaluation: %s"%config_file)
     
     # move log file to path
