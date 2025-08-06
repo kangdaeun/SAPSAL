@@ -97,16 +97,17 @@ if __name__ == '__main__':
 
          
     if 'cuda' in c.device:
-         import GPUtil
-         DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
-                                                   maxMemory=GPU_MAX_MEMORY,
-                                                   attempts=GPU_ATTEMPTS,
-                                                   interval=GPU_WAIT_S,
-                                                   excludeID=GPU_EXCLUDE_IDS,
-                                                   verbose=VERBOSE)
-         DEVICE_ID = DEVICE_ID_LIST[0]
-         c.device = 'cuda:{:d}'.format(DEVICE_ID)
-    
+        if 'cuda:' not in c.device:
+            import GPUtil
+            DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
+                                                    maxMemory=GPU_MAX_MEMORY,
+                                                    attempts=GPU_ATTEMPTS,
+                                                    interval=GPU_WAIT_S,
+                                                    excludeID=GPU_EXCLUDE_IDS,
+                                                    verbose=VERBOSE)
+            DEVICE_ID = DEVICE_ID_LIST[0]
+            c.device = 'cuda:{:d}'.format(DEVICE_ID)
+
     elif 'mps' in c.device: # request to use MAC GPU
         # CPU will be used if MPS is not available, assuming you are running on MAC
         if torch.backends.mps.is_available() * torch.backends.mps.is_built():

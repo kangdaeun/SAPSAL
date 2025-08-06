@@ -500,7 +500,7 @@ def add_slab_veil(wl, fl, veil, fslab_750, return_veil=False):
 
 def remove_veil(wl, fl, veil, fslab_norm = None, return_veil=False):
     
-    f750 = exp.get_f750(wl, fl)
+    f750 = get_f750(wl, fl)
 
     # for only one spectrum
     if fl.ndim == 1:
@@ -512,7 +512,7 @@ def remove_veil(wl, fl, veil, fslab_norm = None, return_veil=False):
     elif fl.ndim == 2: # for multiple spectrum that shares  wavelength and spectral bin but different veiling value
         if len(veil)==fl.shape[0]:
             if fslab_norm is None:
-                veiling = veil / (1+veil) * f750.reshape(-1,1)
+                veiling = (veil / (1+veil) * f750 )[:, None]
             else:
                 veiling = (veil / (1+veil) * f750)[:, None] * fslab_norm
         else:
@@ -540,6 +540,18 @@ def read_example_slab():
     # np.loadtxt(filepath)
     return float_array
 
+def read_slab_grid(slab_grid_file):
+    
+    file_path = Path(slab_grid_file)
+    extension = file_path.suffix.lower()
+    if extension == '.parquet':
+        slab_grid = pd.read_parquet(slab_grid_file)
+    else:
+        slab_grid = pd.read_csv(slab_grid_file)
+ 
+    return slab_grid
+    
+
 
 def assign_slab_grid(slab_grid_file, params, x_names, y_names, random_seed=0):
     
@@ -548,7 +560,8 @@ def assign_slab_grid(slab_grid_file, params, x_names, y_names, random_seed=0):
     N = len(params)
     
     # 1. slab_grid 불러오기
-    slab_grid = pd.read_csv(slab_grid_file)
+    # slab_grid = pd.read_csv(slab_grid_file)
+    slab_grid = read_slab_grid(slab_grid_file)
     
     # 2. slab_grid에서 각 행마다 무작위 샘플 하나씩 선택 (슬라이스로)
     slab_idxs = np.random.randint(0, len(slab_grid), size=N)

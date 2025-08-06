@@ -8,11 +8,6 @@ Created on Tue Sep 13 15:00:50 2022
 
 hyperparam 랜덤으로 바꿔가며 여러 네트워크를 훈련
 
-[To do]
-- 최종 그림들 옮기는 것
-- outputdir도 설정할 수 있으면?
-
-
 1) hyperparam 조건 셋팅
     - 파라미터마다 랜덤하게 사용할 함수 선택 필요
     - 고정되는 정보들이 있다: 
@@ -31,13 +26,6 @@ For
     - 선택에 필요한 지표들을 계산하는 역할
 endFor
 3) 판단. 혹은 판단 지표
-
-
-
-parser.add_argument('config_file', help="Run with specified config file as basis.")
-parser.add_argument('-s','--suffix', required=False, default=None, help="Output suffix")
-parser.add_argument('-o','--outputdir', required=False, default=None, help="Output directory")
-parser.add_argument('-r','--resume', required=False, default=None, help="Resume Hyperparameter search or not (T/F)")
     
 """
 
