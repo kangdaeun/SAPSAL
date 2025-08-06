@@ -17,6 +17,7 @@ import matplotlib.cm as cm
 from time import time
 import pickle
 import torch
+import gc
 from argparse import ArgumentParser
 
 # from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -316,7 +317,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     
     #%% 1) Latent tests
     if run_forward:
-        c.load_network_model()
+        if not c.network_model:
+            c.load_network_model()
         # for z tests, keep similar to training situation: raundom sigma, smoothing 
         z_all = tools.calculate_z(c.network_model, astro, smoothing=c.train_smoothing)
         tools.plot_z(z_all, figname=figurename_dic['z_cov'], corrlabel=True, title=network_name,
@@ -334,7 +336,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     
     #%% Domain adaptaion test
     if run_Ddist:
-        c.load_network_model()
+        if not c.network_model:
+            c.load_network_model()
         D_test, D_real = tools.calculate_D(c.network_model, astro, smoothing=c.train_smoothing)
         tools.plot_D_distribution(c, D_test, D_real, figname=figurename_dic['Ddist'], return_figure=False,
                             title=network_name, titlesize='large'  )
@@ -397,7 +400,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     # result: calib_table
         
     if run_all_post:
-        
+        if not c.network_model:
+            c.load_network_model()
         print("Start process")
         t_start = time()
         
@@ -831,6 +835,9 @@ if __name__=='__main__':
     # _ = torch.Tensor([0]).to(c.device)
     astro.device = c.device
    
+    # allocate network to memory
+    if not c.network_model:
+        c.load_network_model()
     print("==================== CINN NETWORK SETTING =================")
     print("cINN_config:", config_file)
     print("# of parameters:", c.x_dim)
@@ -846,9 +853,13 @@ if __name__=='__main__':
             evaluate(c, astro=astro, lsig_fix=lsig_set)
             break  # escape loop if succeed
         except RuntimeError as e:
-            if "CUDA out of memory" in str(e):
+            if "CUDA out of memory" in str(e) or "CUDA out of memory" in str(e.__cause__) or "CUDA error: out of memory" in str(e):
                 print(f"[{c.device}] CUDA OOM error. Find device again.")
+                # release cuda memory
+                c.network_model=None
+                gc.collect()
                 torch.cuda.empty_cache()
+                # find new gpu
                 DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
                                                           maxMemory=GPU_MAX_MEMORY,
                                                           attempts=GPU_ATTEMPTS,
@@ -858,6 +869,7 @@ if __name__=='__main__':
                 DEVICE_ID = DEVICE_ID_LIST[0]
                 c.device = 'cuda:{:d}'.format(DEVICE_ID)
                 astro.device = c.device
+                c.load_network_model()
             else:
                 print(str(e))
                 raise
