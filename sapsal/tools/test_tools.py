@@ -149,6 +149,7 @@ def calculate_z(model, astro, smoothing=True):
     xT = torch.Tensor(x_test).to(astro.device)
     yT = torch.Tensor(y_test).to(astro.device)
     
+    model.eval()
     features = model.cond_net.features(yT)
 
     with torch.no_grad():
@@ -701,6 +702,7 @@ def calculate_D(model, astro, smoothing=False,
         y_test = torch.Tensor(y_test).to(astro.device)
         y_real = torch.Tensor(y_real).to(astro.device)
     
+    model.eval()
     with torch.no_grad():
         features_test = model.cond_net.features(y_test)
         D_test = model.da_disc(features_test)
@@ -775,7 +777,7 @@ def calculate_tSNE(model, astro, smoothing=False, do_pca = False, n_components_p
         y_test = torch.Tensor(y_test).to(astro.device)
         y_real = torch.Tensor(y_real).to(astro.device)
         
-        
+    model.eval()  
     with torch.no_grad():
         features_test = model.cond_net.features(y_test).detach().cpu().numpy()
        
@@ -833,7 +835,7 @@ def calculate_umap(model, astro, smoothing=False, do_pca = False, n_components_p
         y_test = torch.Tensor(y_test).to(astro.device)
         y_real = torch.Tensor(y_real).to(astro.device)
         
-        
+    model.eval()  
     with torch.no_grad():
         features_test = model.cond_net.features(y_test).detach().cpu().numpy()
        
@@ -936,7 +938,7 @@ def calculate_domain_distance(model, astro, smoothing=False, option='CMD',
     else:
         y_test = torch.Tensor(y_test).to(astro.device)
         y_real = torch.Tensor(y_real).to(astro.device)
-    
+    model.eval()
     with torch.no_grad():
         features_test = model.cond_net.features(y_test)
         features_real = model.cond_net.features(y_real)
@@ -1074,7 +1076,7 @@ def eval_DA_status(model, astro, save_features=True, tf_filename=None, rf_filena
        
     if save_features:
         # calculate features
-        
+        model.eval()
         with torch.no_grad():
             features_test = model.cond_net.features(torch.Tensor(y_test).to(astro.device)).detach().cpu().numpy()
             features_real = model.cond_net.features(torch.Tensor(y_real).to(astro.device)).detach().cpu().numpy()
