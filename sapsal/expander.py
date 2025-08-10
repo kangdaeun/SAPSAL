@@ -179,14 +179,17 @@ def generate_random_parameter(N_data, min_value = None, max_value = None,
 
     return values
 
-def get_spec_index(y_names, get_loc=False):
+def get_spec_index(y_names, get_loc=False, use_bool=False):
     # filter out indices for spectral bins : l2, l231, from y_names:
     # not the index in y_names, it changes 'l0' -> 0
         
     # [s for s in c.y_names if s.startswith('l') and s[1:].isdigit()][-1]
     
     if get_loc:
-        return np.array([i for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()])
+        if use_bool==True:
+            return np.array([s.startswith('l') and s[1:].isdigit() for s in y_names]) # True/False with len(y_names)
+        else:
+            return np.array([i for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()]) # only index length = selected indices
     else:
         return np.array([int(s[1:]) for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()]) 
 
