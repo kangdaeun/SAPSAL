@@ -319,6 +319,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     if run_forward:
         if not c.network_model:
             c.load_network_model()
+            c.network_model.eval()
         # for z tests, keep similar to training situation: raundom sigma, smoothing 
         z_all = tools.calculate_z(c.network_model, astro, smoothing=c.train_smoothing)
         tools.plot_z(z_all, figname=figurename_dic['z_cov'], corrlabel=True, title=network_name,
@@ -338,6 +339,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     if run_Ddist:
         if not c.network_model:
             c.load_network_model()
+            c.network_model.eval()
         D_test, D_real = tools.calculate_D(c.network_model, astro, smoothing=c.train_smoothing)
         tools.plot_D_distribution(c, D_test, D_real, figname=figurename_dic['Ddist'], return_figure=False,
                             title=network_name, titlesize='large'  )
@@ -402,6 +404,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     if run_all_post:
         if not c.network_model:
             c.load_network_model()
+            c.network_model.eval()
         print("Start process")
         t_start = time()
         
@@ -838,6 +841,7 @@ if __name__=='__main__':
     # allocate network to memory
     if not c.network_model:
         c.load_network_model()
+        c.network_model.eval()
     print("==================== CINN NETWORK SETTING =================")
     print("cINN_config:", config_file)
     print("# of parameters:", c.x_dim)
