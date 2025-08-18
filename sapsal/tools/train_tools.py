@@ -14,6 +14,12 @@ import numpy as np
 CONV_CUT = 1e-5
 N_CONV_CHECK = 20
 
+# convergence using moving average
+N_CONV_MA = 30     # number of epochs to calcualte moving average
+N_CONV_MA_CHECK = 60   # number of moving averages to check
+CONV_CUT_MA = 5e-4  # cur when uisng  moving average
+
+# Deprecated
 CONV_CUT_ROUGH = 2e-3
 N_CONV_CHECK_ROUGH = 50
 N_CONV_CHECK_ROUGH_START = 150
@@ -75,25 +81,47 @@ def check_divergence(loss_array, chunk_size=DIVG_CHUNK_SIZE, n_divg_check=N_DIVG
     return divergence
 
 def check_convergence(loss_array, conv_cut=CONV_CUT, n_conv_check=N_CONV_CHECK):
+    # |L(n+1)/L(n) - 1| < small value (1e-5)
     roi_conv = abs(loss_array[1:]/loss_array[:-1] -1 ) < conv_cut
     roi_conv = np.append([False], roi_conv)
     
+    # If the last loss is NaN of InF => not converged
     if np.isfinite(loss_array[-1])==False:
         return False
+    # If the median of latest 5 losses is positive => not converged 
+    # because we are using negative log likelihood loss
     if np.median(loss_array[-5:])>0:
         return False
-    
-    if np.sum(roi_conv[-n_conv_check:])==n_conv_check:
-        return True
-    elif len(loss_array) > N_CONV_CHECK_ROUGH + N_CONV_CHECK_ROUGH_START: # rough second check
-        roi_conv_rough = abs(loss_array[1:]/loss_array[:-1] -1) < CONV_CUT_ROUGH
-        roi_conv_rough = np.append([False], roi_conv_rough)  
-        if np.sum(roi_conv_rough[-N_CONV_CHECK_ROUGH:])==N_CONV_CHECK_ROUGH:
+
+    # Mostly, above first criterion is hard to satisfy
+    # Instead, check moving average
+    if len(loss_array) >= N_CONV_MA_CHECK+N_CONV_MA:
+        # moving average
+        ma_array = np.array([ np.mean(loss_array[i:i+N_CONV_MA]) for i in range(len(loss_array)-N_CONV_MA+1)])
+        roi_conv = np.abs(ma_array[1:]/ma_array[:-1] - 1) < CONV_CUT_MA
+        if np.sum(roi_conv[-N_CONV_MA_CHECK:])==N_CONV_MA_CHECK:
             return True
         else:
             return False
     else:
         return False
+        
+    # [DEPRECATED] Check convergence only after some minimum epochs: n_conv_check ~ 20
+    # + check the latest n_conv_check epochs
+    # if all latest bins satisfy the criterion
+    # if np.sum(roi_conv[-n_conv_check:])==n_conv_check:
+    #     return True
+    # elif len(loss_array) > N_CONV_CHECK_ROUGH + N_CONV_CHECK_ROUGH_START: # rough second check
+    #     # after somewhat enoough epochs (150+50)
+    #     # increase the cut value
+    #     roi_conv_rough = abs(loss_array[1:]/loss_array[:-1] -1) < CONV_CUT_ROUGH
+    #     roi_conv_rough = np.append([False], roi_conv_rough)  
+    #     if np.sum(roi_conv_rough[-N_CONV_CHECK_ROUGH:])==N_CONV_CHECK_ROUGH:
+    #         return True
+    #     else:
+    #         return False
+    # else:
+    #     return False
     
 
 def rewrite_config_element(config_file,  new_config_file, param_to_change, value_to_change,):
