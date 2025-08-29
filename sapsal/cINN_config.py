@@ -281,6 +281,21 @@ class cINNConfig():
                     'flag_dic': None, # dictionay: key=name of flag, item = list of y_names to turn on/off (requried)
                     'flag_names': None, # list of keys of flag_dic (auto)
                     'flag_index_dic': None, # dictionaly; keya name of flag, item = list of indicees of corresponding y (auto) 
+                    
+                    # [TEST] Selection of conditioning network (feature network)
+                    'cond_net_code': 'linear', # default is linear to maintain other networks
+                                            # linear: use FeatureNet in model file. This is fully connected network. 
+                                            #       Control with feature_width, feature_layer, y_dim_features in config
+                                            # hybrid_cnn: use HybridFeatureNetin feature_net.py. Combination of CNN and global_net (linear)
+                                            #       Control with two config_dictionaries: conv_net_config, global_net_config
+                                            # cnn: use ConvolutionalNetwork as a feature net. give  conv_net_config
+                    'conv_net_config': {"in_dim_conv": None, "out_dim_conv":256, #"n_layers":3, 
+                                        "in_channels":1, "start_channels":16,
+                                        "kernel_size_filter": 3, "kernel_size_pooling":2,
+                                        "stride_filter":2, "stride_pooling":2,
+                                        },
+                    
+                    'global_net_config':  {"in_dim_global": None, "out_dim_global":4, "n_layers_global":2,}, 
                                   
                     }
                     
@@ -367,6 +382,17 @@ class cINNConfig():
                 self.y_dim_in += len(self.flag_names)
             if self.wavelength_coupling==True:
                 self.y_dim_in += len(self.y_names)
+                
+        if self.cond_net_code=="hybrid_cnn":
+            # give in_dim to conv_net and global_net -> count global params and spectral points
+            self.conv_net_config['in_dim_conv'] = sum(1 for s in self.y_names if s.startswith('l') and s[1:].isdigit())
+            self.global_net_config['in_dim_global'] = len(self.y_names) - self.conv_net_config['in_dim_conv']
+            if self.prenoise_training==True:
+                self.conv_net_config["in_channels"]=2
+                self.global_net_config['in_dim_global'] *= 2
+            else: 
+                self.conv_net_config["in_channels"]=1
+                
 
             
     def update_proj_dir(self, change_filename=True, change_tablename=True): #, change_expander=True): # expander deprecated
@@ -796,6 +822,14 @@ class cINNConfig():
 #        for param in ["architecture", "model_code", "FrEIA_ver"]:
         for param in ["model_code"]:
             contents.append(simple_sentence(self, param))
+        new_line(contents)
+        
+        # TEST
+        contents.append( "# Set cond_net_code:'linear' , 'hybrid_cnn'. if not set, default is linear" )
+        contents.append(simple_sentence(self, 'cond_net_code'))
+        if  self.cond_net_code=="hybrid_cnn":
+            contents.append(simple_sentence(self, "conv_net_config"))
+            contents.append(simple_sentence(self, "global_net_config"))
         new_line(contents)
         
         # test_frac

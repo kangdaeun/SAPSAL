@@ -70,6 +70,11 @@ def load_data_for_situation(astro, smoothing=False, random_seed=0):
         if "A_V" in astro.random_parameters.keys():
             extinct_flux = True
             
+    dummy_slab = False
+    if veil_flux==True and astro.additional_kwarg is not None:
+        if "dummy_slab" in astro.additional_kwarg.keys():
+            dummy_slab=True
+            
     # smoothing is different for situation:
     # for z_test: do smoothing
     # for prediction: do not smooth
@@ -83,7 +88,7 @@ def load_data_for_situation(astro, smoothing=False, random_seed=0):
                                          normalize_total_flux=astro.normalize_total_flux, 
                                          normalize_mean_flux=astro.normalize_mean_flux,
                                          veil_flux = veil_flux, extinct_flux = extinct_flux, 
-                                         random_seed=random_seed,
+                                         random_seed=random_seed,dummy_slab=dummy_slab,
                                          )
     x_test, y_test = test[0], test[1]
     
@@ -113,6 +118,8 @@ def load_data_for_situation(astro, smoothing=False, random_seed=0):
         
     else:
         pass
+    
+    
     
     return (x_test, y_test) 
     # xy in rescaled. y_test include all to feed into cond_net
@@ -147,10 +154,27 @@ def calculate_z(model, astro, smoothing=True):
     
     # change to torch and device
     xT = torch.Tensor(x_test).to(astro.device)
-    yT = torch.Tensor(y_test).to(astro.device)
+    
+    if astro.cond_net_code=="hybrid_cnn":
+        # Need to divide spec_data (for cnn) and global_data (for global_net)
+        roi_spec = astro.exp.get_spec_index(astro.y_names, get_loc=True, use_bool=True)
+        if astro.prenoise_training==True:
+            # divide y and sigma in axis=1
+            y_3d = y_test.reshape(-1, 2, len(astro.y_names)) 
+            spec_data = y_3d[:, :, roi_spec] # (Models, channel, spectral points)
+            global_data = y_3d[:, :, np.invert(roi_spec)].reshape(y_test.shape[0], -1) # (Models, global params, including their noises)
+        else:
+            spec_data = (y_test[:, roi_spec])[:,None,:]
+            global_data = (y_test[:, np.invert(roi_spec)])[:,None,:]
+        
+        yT = (torch.Tensor(spec_data).to(astro.device), torch.Tensor(global_data).to(astro.device))
+    else:
+        # in general, when using linear. y_test is one tensor
+        yT = torch.Tensor(y_test).to(astro.device)
     
     model.eval()
-    features = model.cond_net.features(yT)
+    with torch.no_grad():
+        features = model.cond_net.features(yT)
 
     with torch.no_grad():
         zT, _ = model.model(xT, features, rev=False)

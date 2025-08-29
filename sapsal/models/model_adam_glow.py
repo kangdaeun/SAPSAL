@@ -12,7 +12,11 @@ from torch.autograd import Variable
 #import FrEIA0p2.modules as Fm0p2
 from ..FrEIA import framework as Ff
 from ..FrEIA import modules as Fm
+from .feature_net import HybridFeatureNet #  ConvolutionalNetwork, GlobalParamNetwork,
+from typing import List, Tuple, Union
 
+
+    
 
 class FeatureNet(nn.Module):
     def __init__(self, c):
@@ -33,11 +37,11 @@ class FeatureNet(nn.Module):
 
         self.fc_final = nn.Linear(c.y_dim_features, c.x_dim)
 
-    def forward(self, x):
+    def forward(self, x): # not used
         x = self.linear(x)
         return self.fc_final(x)
 
-    def features(self, x):
+    def features(self, x): # features is used to get feature from conditioning network. 
         return self.linear(x)
 
 
@@ -46,8 +50,10 @@ class ModelAdamGLOW(nn.Module):
     def __init__(self, c):
         
         super().__init__()
-        
-        self.cond_net = FeatureNet(c)
+        if c.cond_net_code=="hybrid_cnn":
+            self.cond_net = HybridFeatureNet(c)
+        else:
+            self.cond_net = FeatureNet(c)
         self.cond_net.to(c.device)
         self.model = self.build_network(c)
         if c.domain_adaptation:

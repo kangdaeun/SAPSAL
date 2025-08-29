@@ -475,8 +475,13 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                                                   disable=(not c.progress_bar),
                                                   ncols=83):
     
-                x, y = data_tuple
-                
+                if c.cond_net_code=="hybrid_cnn":
+                    x, y1, y2 = data_tuple
+                    x = x.to(c.device)
+                    y = ( y1.to(c.device),  y2.to(c.device))
+                else:
+                    x, y = data_tuple
+                    x, y = x.to(c.device), y.to(c.device)
                 # # Noise-Net: prenoise training => 2025.05.28 This is moved to data_loader. Now alwasy get_loader return rescaled values
                 # # In prenoise training, data are in physical scale (param, obs)
                 # if c.prenoise_training:
@@ -498,7 +503,7 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                 #     x = torch.Tensor(data.params_to_x(x))
                 #     y = torch.hstack((torch.Tensor(data.obs_to_y(y)), torch.Tensor(data.unc_to_sig(10**sig))))
                 
-                x, y = x.to(c.device), y.to(c.device)
+                
       
 
                 # Domain Adaptaion
@@ -644,9 +649,13 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                                                   disable=(not c.progress_bar),
                                                   ncols=83):
     
-                x, y = test_tuple
-                
-                x, y = x.to(c.device), y.to(c.device)
+                if c.cond_net_code=="hybrid_cnn":
+                    x, y1, y2 = test_tuple
+                    x = x.to(c.device)
+                    y = ( y1.to(c.device),  y2.to(c.device))
+                else:
+                    x, y = test_tuple
+                    x, y = x.to(c.device), y.to(c.device)
 
                 with torch.no_grad():
                     features = model.cond_net.features(y)
@@ -3151,6 +3160,7 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
     if c.network_model is None:
         c.load_network_model()
     model = c.network_model
+    model.eval()
     
     # model = eval(c.model_code)(c)
     # model.load(c.filename, device=c.device)
@@ -3160,7 +3170,29 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
         print('Use %s'%(c.filename))
 
     # y_it have to be an 1D/2D torch tensor/list/np array (c.y_dim_in or (# of y) x c.y_dim)
-    y_it = torch.Tensor(y_it).reshape(-1, c.y_dim_in) # Make 2D torch Tensor even if you gave only 1D tensor (1, c.y_dim_in)
+    # if cond_net_code==hybrid_cnn. y_it should be tuple of (Tensor, Tensor)
+    # input is ready for most cases. but change for 1 obs case.
+    if c.cond_net_code=="hybrid_cnn":
+        conv_data, global_data = y_it 
+        if global_data.ndim==1: 
+            n_samp = 1
+            global_data = torch.Tensor(global_data)[None, :] # make 2D
+            conv_data = torch.Tensor(conv_data)[None, :, :] # make 3D
+        else:
+            global_data = torch.Tensor(global_data)
+            conv_data = torch.Tensor(conv_data)
+            n_samp = global_data.shape[0] 
+        y_it = (conv_data, global_data)
+    else:
+        # input is one Tensor
+        y_it = torch.Tensor(y_it)
+        if y_it.ndim==1: # if  input is just one observation. Make it to 2D tensor
+            y_it = y_it[None,:] 
+        n_samp = y_it.shape[0]
+    
+    # y_it = torch.Tensor(y_it).reshape(-1, c.y_dim_in) # Make 2D torch Tensor even if you gave only 1D tensor (1, c.y_dim_in)
+    
+    
     outputs = []
     
     # if return_llike = True, it will calculate llike and return both outputs and llike
@@ -3168,9 +3200,16 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
     if return_llike:
         llikes = []
         
-    for num, y in enumerate(y_it):
-
-        features = model.cond_net.features(y.view(1,-1).to(c.device)).view(1, -1).expand(N, -1)
+    # for num, y in enumerate(y_it):
+    for num in range(n_samp):
+        with torch.no_grad():
+            if c.cond_net_code=="hybrid_cnn":
+                y_glob = (y_it[0][num])[None,:]
+                y_conv = (y_it[1][num])[None,:] 
+                features = model.cond_net.features( (y_conv.to(c.device), y_glob.to(c.device)) ).view(1,-1).expand(N, -1)
+            else:
+                y = y_it[num]
+                features = model.cond_net.features(y.view(1,-1).to(c.device)).view(1, -1).expand(N, -1)
         z = torch.randn(N, c.x_dim).to(c.device)
 
         with torch.no_grad():
@@ -3200,13 +3239,32 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
     if c.network_model is None:
         c.load_network_model()
     model = c.network_model
+    model.eval()
     
     if not quiet:
         print('Use %s'%(c.model_code))
         print('Use %s'%(c.filename))
 
     # y_it have to be an 1D/2D torch tensor/list/np array (c.y_dim_in or (# of y) x c.y_dim)
-    y_it = torch.Tensor(y_it).reshape(-1, c.y_dim_in) # Make 2D torch Tensor even if you gave only 1D tensor (1, c.y_dim_in)
+    # y_it = torch.Tensor(y_it).reshape(-1, c.y_dim_in) # Make 2D torch Tensor even if you gave only 1D tensor (1, c.y_dim_in)
+    
+    if c.cond_net_code=="hybrid_cnn":
+        conv_data, global_data = y_it 
+        if global_data.ndim==1: 
+            n_samp = 1
+            global_data = torch.Tensor(global_data)[None, :] # make 2D
+            conv_data = torch.Tensor(conv_data)[None, :, :] # make 3D
+        else:
+            global_data = torch.Tensor(global_data)
+            conv_data = torch.Tensor(conv_data)
+            n_samp = global_data.shape[0] 
+        y_it = (conv_data, global_data)
+    else:
+        # input is one Tensor
+        y_it = torch.Tensor(y_it)
+        if y_it.ndim==1: # if  input is just one observation. Make it to 2D tensor
+            y_it = y_it[None,:] 
+        n_samp = y_it.shape[0]
     
     # if return_llike = True, it will calculate llike and return both outputs and llike
     # Or you can calculate llike separately by using get_loglikelihood function
@@ -3221,42 +3279,47 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
     elif group > g_max:
         group = g_max
         
-    
-    
-    n_group = y_it.shape[0]//group
-    if y_it.shape[0]%group > 0:
+    n_group = n_samp//group
+    if n_samp%group > 0:
         n_group += 1
     
     for i_group in range(n_group):
         
-        y = y_it[group*i_group: group*(i_group+1)]
-        ny = y.shape[0]
-        
-        features = model.cond_net.features(y.to(c.device)).view(ny,1,-1).expand(-1, N,-1).reshape(ny*N,-1)
-        z = torch.randn(features.shape[0], c.x_dim).to(c.device)
-        
         with torch.no_grad():
-            x_samples, _ =  model.model(z, features, rev=True)
-            
-        output = x_samples.data.cpu().numpy().reshape(ny, N, -1)
-        if i_group==0:
-            outputs = output
-        else:
-            outputs = np.vstack((outputs, output))
-            
-            
-        if return_llike:
-            with torch.no_grad():
-                _, jac =  model.model(x_samples, features, rev=False)
-            
-            zz = torch.sum(z**2., dim=1)
-            log_likelihood = -(0.5*zz) + jac
-            llike =  log_likelihood.to('cpu').detach().numpy().reshape(ny, -1)
-            
-            if i_group==0:
-                llikes = llike
+            if c.cond_net_code=="hybrid_cnn":
+                y_glob = global_data[group*i_group: group*(i_group+1)]
+                y_conv = conv_data[group*i_group: group*(i_group+1)]
+                ny = y_glob.shape[0]
+                features = model.cond_net.features( (y_conv.to(c.device), y_glob.to(c.device)) ).view(ny,1,-1).expand(-1, N,-1).reshape(ny*N,-1)  
             else:
-                llikes = np.vstack((llikes, llike))
+                y = y_it[group*i_group: group*(i_group+1)]
+                ny = y.shape[0]
+                features = model.cond_net.features(y.to(c.device)).view(ny,1,-1).expand(-1, N,-1).reshape(ny*N,-1)
+                
+            z = torch.randn(features.shape[0], c.x_dim).to(c.device)
+            
+            # with torch.no_grad():
+            x_samples, _ =  model.model(z, features, rev=True)
+                
+            output = x_samples.data.cpu().numpy().reshape(ny, N, -1)
+            if i_group==0:
+                outputs = output
+            else:
+                outputs = np.vstack((outputs, output))
+                
+                
+            if return_llike:
+                # with torch.no_grad():
+                _, jac =  model.model(x_samples, features, rev=False)
+                
+                zz = torch.sum(z**2., dim=1)
+                log_likelihood = -(0.5*zz) + jac
+                llike =  log_likelihood.to('cpu').detach().numpy().reshape(ny, -1)
+                
+                if i_group==0:
+                    llikes = llike
+                else:
+                    llikes = np.vstack((llikes, llike))
 
     # return a 3D ndarray (each array is N x c.x_dim)
     # but this is x!!! you have to use astro.x_to_params -> this will automatically change list to np array
@@ -3264,6 +3327,93 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
         return np.array(outputs), np.array(llikes)
     else:
         return np.array(outputs)
+    
+    
+# def get_posterior_group_hybrid(y_it, c, N=4096, group=None, return_llike=False, quiet=False):
+#     """
+#     This is get_posterio_group for the network using hybrid_cnn cond_net
+#     """
+    
+#     # import torch
+#     if c.network_model is None:
+#         c.load_network_model()
+#     model = c.network_model
+#     model.eval()
+    
+#     if not quiet:
+#         print('Use %s'%(c.model_code))
+#         print('Use %s'%(c.filename))
+
+#     # y_it is tuple of two array: conv_data, global_data
+#     # conv_data: (Nobs, Nchannel, N_data)
+#     # global_data: (Nobs, N_data_global)
+    
+#     # if return_llike = True, it will calculate llike and return both outputs and llike
+#     # Or you can calculate llike separately by using get_loglikelihood function
+#     if return_llike:
+#         llikes = []
+        
+#     # g_max = int(1e8/(c.x_dim*2+c.y_dim_in)/N)
+#     g_max = int(4e6/N)
+#     if g_max < 1: g_max = 10
+#     if group is None:
+#         group = g_max
+#     elif group > g_max:
+#         group = g_max
+        
+#     conv_data, global_data = y_it 
+#     if global_data.ndim==1: 
+#         n_samp = 1
+#         global_data = torch.Tensor(global_data)[None, :] # make 2D
+#         conv_data = torch.Tensor(conv_data)[None, :, :] # make 3D
+#     else:
+#         global_data = torch.Tensor(global_data)
+#         conv_data = torch.Tensor(conv_data)
+#         n_samp = global_data.shape[0] 
+    
+#     n_group = n_samp//group
+#     if n_samp%group > 0:
+#         n_group += 1
+    
+#     for i_group in range(n_group):
+        
+#         y_glob = global_data[group*i_group: group*(i_group+1)]
+#         y_conv = conv_data[group*i_group: group*(i_group+1)]
+        
+#         ny = y_glob.shape[0]
+        
+#         features = model.cond_net.features( (y_glob.to(c.device), y_conv.to(c.device)) ).view(ny,1,-1).expand(-1, N,-1).reshape(ny*N,-1)
+#         z = torch.randn(features.shape[0], c.x_dim).to(c.device)
+        
+#         with torch.no_grad():
+#             x_samples, _ =  model.model(z, features, rev=True)
+            
+#         output = x_samples.data.cpu().numpy().reshape(ny, N, -1)
+#         if i_group==0:
+#             outputs = output
+#         else:
+#             outputs = np.vstack((outputs, output))
+            
+            
+#         if return_llike:
+#             with torch.no_grad():
+#                 _, jac =  model.model(x_samples, features, rev=False)
+            
+#             zz = torch.sum(z**2., dim=1)
+#             log_likelihood = -(0.5*zz) + jac
+#             llike =  log_likelihood.to('cpu').detach().numpy().reshape(ny, -1)
+            
+#             if i_group==0:
+#                 llikes = llike
+#             else:
+#                 llikes = np.vstack((llikes, llike))
+
+#     # return a 3D ndarray (each array is N x c.x_dim)
+#     # but this is x!!! you have to use astro.x_to_params -> this will automatically change list to np array
+#     if return_llike:
+#         return np.array(outputs), np.array(llikes)
+#     else:
+#         return np.array(outputs)
     
     
 # It is better to use get_posterior and calculate both posterior and llike at once - reduce error and computational time

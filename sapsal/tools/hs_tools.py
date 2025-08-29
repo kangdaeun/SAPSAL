@@ -132,12 +132,26 @@ def randomize_config(c_ref, search_parameters, output_filename,
     # Update output directory and device
     c.device = device
     
+    # for hybrid_cnn mode
+    conv_net_config_params = ["out_dim_conv", "start_channels", "kernel_size_filter", "kernel_size_pooling"
+                        "stride_filter", "stride_pooling"]
+    global_net_config_params = ["out_dim_global", "n_layers_global"]
+    
     # Randomize settings specified in search parameters
     for key in search_parameters.keys():
         func_key, qwargs_key = search_parameters[key]
-        setattr(c, key, func_key(**qwargs_key) )
+        if key in conv_net_config_params:
+            c.conv_net_config[key] = func_key(**qwargs_key)   
+        elif key in global_net_config_params:
+            c.global_net_config[key] = func_key(**qwargs_key)   
+        else:
+            setattr(c, key, func_key(**qwargs_key) )
         
-        
+    # for hybrid_cnn
+    if c.cond_net_code =='hybrid_cnn':
+        if c.conv_net_config["out_dim_conv"] < c.y_dim_features: # spectral features should be equal or larger than final dim
+            c.conv_net_config["out_dim_conv"] = c.y_dim_features
+            
     # If using domain adaption and da_disc_set_optim = False, set da_disc setting same as main network
     if c.domain_adaptation:
         if c.da_disc_set_optim != True:

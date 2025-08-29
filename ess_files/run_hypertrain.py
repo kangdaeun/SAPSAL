@@ -41,6 +41,7 @@ from time import time
 from time import sleep
 
 from sapsal.cINN_config import read_config_from_file
+from sapsal.expander import find_gpu_available
 # from sapsal.data_loader import *
 # from sapsal.execute import train_network as train_normal_network
 
@@ -75,6 +76,7 @@ if NUM_CPUS:
 
 DEVICE = 'cuda'              # Device to run search on, either 'cuda' or 'cpu'
 # These GPU setup is not used in this code.
+MIN_FREE_MEMORY_MIB = None   # Minimum available VRAM in MiB. 
 GPU_MAX_LOAD = 0.1          # Maximum compute load of GPU allowed in automated selection
 GPU_MAX_MEMORY = 0.1         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
@@ -106,6 +108,11 @@ SEARCH_PARAMETERS = {
     "feature_layer": (np.random.randint, {"low":3, "high":6+1}), # usually fixed to 3 (for Noise 3~9+1) (for Normal 3~5+1)
     "feature_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 512
     "y_dim_features" : (tools.rand_in_log2, {"a":7, "b":9}),
+    
+    "out_dim_conv" : (tools.rand_in_log2, {"a":8, "b":9}),  # only for hybrid_cnn mode. additional conditio n applied: out_dim_conv >= y_dim_features
+    "kernel_size_filter" : (tools.rand_in_discrete, {"options":[3, 5]}), # only for hybrid_cnn mode. kernel size (one value) for CNN
+    "out_dim_global" : (tools.rand_in_log2, {"a":2, "b":3}),  # only for hybrid_cnn mode. 
+    "n_layers_global": (np.random.randint, {"low":2, "high":3+1}), # only for hybrid_cnn mode. 
     # "n_its_per_epoch" : (tools.rand_in_log2, {"a":8, "b":10}),
 #    # "fcl_internal_size" : (tools.rand_in_log2, {"a":7, "b":11}), 
 #    "scale_data" : (tools.rand_bool, {}),
@@ -153,7 +160,21 @@ def change_gpu_exclude_ids(num, add=None, remove=None):
 def update_config_table(config, n):
     
     config_df_path = OUTPUT_DIR + "Config_table_%s.csv" % OUTPUT_SUFFIX
-    config_data = [['%d'%n, config.config_file]+[getattr(config, k) for k in SEARCH_PARAMETERS.keys()]]
+    
+    # config_data = [['%d'%n, config.config_file]+[getattr(config, k) for k in SEARCH_PARAMETERS.keys()]]
+    # for hybrid_cnn
+    conv_net_config_params = ["out_dim_conv", "start_channels", "kernel_size_filter", "kernel_size_pooling"
+                        "stride_filter", "stride_pooling"]
+    global_net_config_params = ["out_dim_global", "n_layers_global"]
+    config_data = ['%d'%n, config.config_file]
+    for k in SEARCH_PARAMETERS.keys():
+        if k in conv_net_config_params: 
+            config_data.append(config.conv_net_config[k])
+        elif k in global_net_config_params:
+            config_data.append(config.global_net_config[k])
+        else:
+            config_data.append(getattr(config, k))
+    config_data = [config_data]
     
     if os.path.exists(config_df_path):
         config_df = pd.read_csv(config_df_path)
@@ -212,14 +233,19 @@ def set_device(config):
     # Find a free GPU to run on if DEVICE == cuda
     if "cuda" in config.device:
         # Get the first available GPU device ID
-        DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
-                                                  maxMemory=GPU_MAX_MEMORY,
-                                                  attempts=GPU_ATTEMPTS,
-                                                  interval=GPU_WAIT_S,
-                                                  excludeID=GPU_EXCLUDE_IDS,
-                                                  verbose=VERBOSE)
-        device_id = DEVICE_ID_LIST[0]
-        config.device = 'cuda:{:d}'.format(device_id)
+        # DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
+        #                                           maxMemory=GPU_MAX_MEMORY,
+        #                                           attempts=GPU_ATTEMPTS,
+        #                                           interval=GPU_WAIT_S,
+        #                                           excludeID=GPU_EXCLUDE_IDS,
+        #                                           verbose=VERBOSE)
+        # device_id = DEVICE_ID_LIST[0]
+        # config.device = 'cuda:{:d}'.format(device_id)
+        device = find_gpu_available(min_free_memory_mib=MIN_FREE_MEMORY_MIB, gpu_max_memory=GPU_MAX_MEMORY,
+                       gpu_max_load=GPU_MAX_LOAD, gpu_wait_s=GPU_WAIT_S, gpu_attempts=GPU_ATTEMPTS,
+                       gpu_exclude_ids=GPU_EXCLUDE_IDS, verbose=VERBOSE, return_list=False)
+        config.device = device
+        device_id = int(device.split(':')[-1])
         change_gpu_exclude_ids(int(device_id), add=True)
         # print("In set_device:",config.device)
     
@@ -531,7 +557,7 @@ if __name__=='__main__':
         
                 
     # 2. Execute Loop : Train + Evaluation
-    # sys.exit()
+    sys.exit()
     t_start = time()
     t_mid = t_start
         
