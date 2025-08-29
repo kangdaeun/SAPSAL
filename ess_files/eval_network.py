@@ -65,9 +65,9 @@ RMSE
 GROUP_SIZE = 400 # n(obs) per one iteration of get_posterior
 N_PRED = 4096 # latent variable sampling  
 
-
-GPU_MAX_LOAD = 0.5           # Maximum compute load of GPU allowed in automated selection. GPUs with a load larger than maxLoad is not returned.
-GPU_MAX_MEMORY = 0.5         # Maximum memory load of GPU allowed in automated selection
+MIN_FREE_MEMORY_MIB = None   # Minimum available VRAM in MiB. 
+GPU_MAX_LOAD = 0.4           # Maximum compute load of GPU allowed in automated selection. GPUs with a load larger than maxLoad is not returned.
+GPU_MAX_MEMORY = 0.4         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
@@ -305,12 +305,17 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         if "A_V" in astro.random_parameters.keys():
             extinct_flux = True
             
+    dummy_slab = False
+    if veil_flux==True and c.additional_kwarg is not None:
+        if "dummy_slab" in c.additional_kwarg.keys():
+            dummy_slab=True
+            
     test_set, train_set = astro.get_splitted_set(rawval=True, smoothing = False, smoothing_sigma = None,
                                                  normalize_flux=c.normalize_flux, 
                                                  normalize_total_flux=c.normalize_total_flux, 
                                                  normalize_mean_flux=c.normalize_mean_flux,
                                                  veil_flux = veil_flux, extinct_flux = extinct_flux, 
-                                                 random_seed=0,
+                                                 random_seed=0, dummy_slab=dummy_slab,
                                                  )
     param_test = test_set[0]; obs_test = test_set[1]   
     N_test = len(param_test)
@@ -816,16 +821,20 @@ if __name__=='__main__':
         
     if 'cuda' in c.device:
         if 'cuda:' not in c.device:
-            import GPUtil
-            DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
-                                                      maxMemory=GPU_MAX_MEMORY,
-                                                      attempts=GPU_ATTEMPTS,
-                                                      interval=GPU_WAIT_S,
-                                                      excludeID=GPU_EXCLUDE_IDS,
-                                                      verbose=VERBOSE)
-            DEVICE_ID = DEVICE_ID_LIST[0]
-            c.device = 'cuda:{:d}'.format(DEVICE_ID)
-    
+            # import GPUtil
+            # DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
+            #                                           maxMemory=GPU_MAX_MEMORY,
+            #                                           attempts=GPU_ATTEMPTS,
+            #                                           interval=GPU_WAIT_S,
+            #                                           excludeID=GPU_EXCLUDE_IDS,
+            #                                           verbose=VERBOSE)
+            # DEVICE_ID = DEVICE_ID_LIST[0]
+            # c.device = 'cuda:{:d}'.format(DEVICE_ID)
+            device = astro.exp.find_gpu_available(min_free_memory_mib=MIN_FREE_MEMORY_MIB, gpu_max_memory=GPU_MAX_MEMORY,
+                       gpu_max_load=GPU_MAX_LOAD, gpu_wait_s=GPU_WAIT_S, gpu_attempts=GPU_ATTEMPTS,
+                       gpu_exclude_ids=GPU_EXCLUDE_IDS, verbose=VERBOSE, return_list=False)
+            c.device = device
+
     elif 'mps' in c.device: # request to use MAC GPU
         # CPU will be used if MPS is not available, assuming you are running on MAC
         if torch.backends.mps.is_available() * torch.backends.mps.is_built():
@@ -864,14 +873,10 @@ if __name__=='__main__':
                 gc.collect()
                 torch.cuda.empty_cache()
                 # find new gpu
-                DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
-                                                          maxMemory=GPU_MAX_MEMORY,
-                                                          attempts=GPU_ATTEMPTS,
-                                                          interval=GPU_WAIT_S,
-                                                          excludeID=GPU_EXCLUDE_IDS,
-                                                          verbose=VERBOSE)
-                DEVICE_ID = DEVICE_ID_LIST[0]
-                c.device = 'cuda:{:d}'.format(DEVICE_ID)
+                device = astro.exp.find_gpu_available(min_free_memory_mib=MIN_FREE_MEMORY_MIB, gpu_max_memory=GPU_MAX_MEMORY,
+                       gpu_max_load=GPU_MAX_LOAD, gpu_wait_s=GPU_WAIT_S, gpu_attempts=GPU_ATTEMPTS,
+                       gpu_exclude_ids=GPU_EXCLUDE_IDS, verbose=VERBOSE, return_list=False)
+                c.device = device
                 astro.device = c.device
                 c.load_network_model()
             else:
@@ -885,6 +890,23 @@ if __name__=='__main__':
         raise RuntimeError(f"Evaluation failed after {MAX_ATTEMPT} attempts due to repeated CUDA OOM.")
         
     print("Finished evaluation: %s"%config_file)
+
+
+    # Check gpu memory used
+    if 'cuda' in c.device:
+        # 1. Print a detailed summary of current memory usage.
+        # This shows the peak usage before any cleanup.
+        print("--- GPU Memory Usage Before Cleanup ---")
+        print(torch.cuda.memory_summary(device=c.device))
+        print("-" * 50)
+        # 2. Clear the GPU memory cache to release resources.
+        # This is where the memory is "emptied".
+        # torch.cuda.empty_cache()
+        # # 3. Print a summary after cleanup to confirm it was successful.
+        # print("--- GPU Memory After Clearing Cache ---")
+        # print(torch.cuda.memory_summary(device=c.device, abbreviated=True))
+        # print("-" * 50)
+
     
     # move log file to path
     if savelog:

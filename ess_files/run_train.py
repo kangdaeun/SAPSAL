@@ -14,13 +14,15 @@ from time import time
 
 # # from cINN.test_execute import train_network
 
+MIN_FREE_MEMORY_MIB = None  # Minimum available VRAM in MiB. 
 GPU_MAX_LOAD = 0.6           # Maximum compute load of GPU allowed in automated selection
 GPU_MAX_MEMORY = 0.6         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
 VERBOSE = True
-MAX_EPOCH = 500 #1000
+
+MAX_EPOCH = 400 #1000
 
 LOG_MODE = True     # Print both console and log # this does not set to save log!
 
@@ -98,15 +100,19 @@ if __name__ == '__main__':
          
     if 'cuda' in c.device:
         if 'cuda:' not in c.device:
-            import GPUtil
-            DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
-                                                    maxMemory=GPU_MAX_MEMORY,
-                                                    attempts=GPU_ATTEMPTS,
-                                                    interval=GPU_WAIT_S,
-                                                    excludeID=GPU_EXCLUDE_IDS,
-                                                    verbose=VERBOSE)
-            DEVICE_ID = DEVICE_ID_LIST[0]
-            c.device = 'cuda:{:d}'.format(DEVICE_ID)
+            # import GPUtil
+            # DEVICE_ID_LIST = GPUtil.getFirstAvailable(maxLoad=GPU_MAX_LOAD,
+            #                                         maxMemory=GPU_MAX_MEMORY,
+            #                                         attempts=GPU_ATTEMPTS,
+            #                                         interval=GPU_WAIT_S,
+            #                                         excludeID=GPU_EXCLUDE_IDS,
+            #                                         verbose=VERBOSE)
+            # DEVICE_ID = DEVICE_ID_LIST[0]
+            # c.device = 'cuda:{:d}'.format(DEVICE_ID)
+            device = astro.exp.find_gpu_available(min_free_memory_mib=MIN_FREE_MEMORY_MIB, gpu_max_memory=GPU_MAX_MEMORY,
+                       gpu_max_load=GPU_MAX_LOAD, gpu_wait_s=GPU_WAIT_S, gpu_attempts=GPU_ATTEMPTS,
+                       gpu_exclude_ids=GPU_EXCLUDE_IDS, verbose=VERBOSE, return_list=False)
+            c.device = device
 
     elif 'mps' in c.device: # request to use MAC GPU
         # CPU will be used if MPS is not available, assuming you are running on MAC
@@ -145,6 +151,21 @@ if __name__ == '__main__':
             train_network(c, data=astro, max_epoch=MAX_EPOCH)
     
     print("Finished training: %s"%config_file)
+
+    # Check gpu memory used
+    if 'cuda' in c.device:
+        # 1. Print a detailed summary of current memory usage.
+        # This shows the peak usage before any cleanup.
+        print("--- GPU Memory Usage Before Cleanup ---")
+        print(torch.cuda.memory_summary(device=c.device))
+        print("-" * 50)
+        # 2. Clear the GPU memory cache to release resources.
+        # This is where the memory is "emptied".
+        # torch.cuda.empty_cache()
+        # # 3. Print a summary after cleanup to confirm it was successful.
+        # print("--- GPU Memory After Clearing Cache ---")
+        # print(torch.cuda.memory_summary(device=c.device, abbreviated=True))
+        # print("-" * 50)
         
     # move log file to path
     if savelog:
