@@ -155,6 +155,7 @@ class DataLoader(cINNConfig):
     def load_data(self, smoothing=False, smoothing_sigma=False, obs_clipping=False,   
                   veil_flux = False, extinct_flux = False,
                   normalize_flux=False, normalize_total_flux=False, normalize_mean_flux=False, normalize_f750 = False,
+                  dummy_slab = False,
                   random_seed = 0.0,
                   **kwargs): #(kwargs = random_seed=0.0, )
         
@@ -250,6 +251,31 @@ class DataLoader(cINNConfig):
         # 2) Smoothing parameter 
         if smoothing:
             all_param = smooth_array(all_param, x_names, smoothing_sigma)
+            
+        # [TEST] Dummy slab: if True, change slab parameters to dummy values, for veil lower than veil_min
+        # for additional informration. use "dummy_slab" dictionary in c.additional_kwarg
+        # Do not use dummy when calculing rescale params!!!
+        if dummy_slab:
+            slab_params_all = ['Tslab','log_ne','log_tau0','log_Fslab']
+            # slab params in x_names
+            slab_params = list(set(x_names) & set(slab_params_all))
+            if 'veil_r' in x_names:
+                veil_values = all_param[:, x_names.index("veil_r")]
+            elif 'log_veil_r' in x_names:
+                veil_values =  10**all_param[:, x_names.index("log_veil_r")]
+            else:
+                raise ValueError("Cannot use dummy slab: neither veil_r nor log_veil_r is in x_names.")
+            
+            roi_dummy = veil_values < self.additional_kwarg["dummy_slab"]["veil_min"]
+            dummy_smoothing = self.additional_kwarg["dummy_slab"].get("smoothing_factor", None)
+            # smoothing factor: add noise to dummy value : dummy = mean + std*(outlier) + N(0, (smoothing_factor*std)^2)
+            for param in slab_params:
+                jj = x_names.index(param)
+                dummy_val = self.mu_x[jj] + self.additional_kwarg["dummy_slab"]["outlier"]*(1/self.w_x[jj,jj]) # 10 sigma outlier
+                if dummy_smoothing:
+                    dummy_val = np.zeros(np.sum(roi_dummy))+dummy_val
+                    dummy_val = smooth(dummy_val, (1/self.w_x[jj,jj])*dummy_smoothing )
+                all_param[roi_dummy, jj] = dummy_val
             
         
         return all_param, all_obs
@@ -350,14 +376,14 @@ class DataLoader(cINNConfig):
     
     def get_splitted_set(self, rawval=True, smoothing = False, smoothing_sigma = None, obs_clipping=False,
                          normalize_flux=False, normalize_total_flux=False, normalize_mean_flux=False, normalize_f750=False,
-                         veil_flux = False, extinct_flux = False, random_seed=0, 
+                         veil_flux = False, extinct_flux = False, random_seed=0, dummy_slab=False,
                          **kwargs):
         
         all_x, all_y = self.get_data(rawval=rawval, smoothing=smoothing,
                       smoothing_sigma=smoothing_sigma, obs_clipping=obs_clipping,
                       normalize_flux=normalize_flux, normalize_total_flux=normalize_total_flux, 
                       normalize_mean_flux=normalize_mean_flux, normalize_f750=normalize_f750,
-                      veil_flux = veil_flux, extinct_flux = extinct_flux, random_seed = random_seed,
+                      veil_flux = veil_flux, extinct_flux = extinct_flux, random_seed = random_seed, dummy_slab=dummy_slab,
                       **kwargs )
         
         test_split = int(self.test_frac * len(all_x))
@@ -389,11 +415,17 @@ class DataLoader(cINNConfig):
             if "A_V" in self.random_parameters.keys():
                 extinct_flux = True
                 
+        dummy_slab = False
+        if veil_flux==True and self.additional_kwarg is not None:
+            if "dummy_slab" in self.additional_kwarg.keys():
+                dummy_slab=True
+           
+                
         all_x, all_y = self.get_data(rawval=rawval, smoothing=self.train_smoothing,
                       smoothing_sigma=self.smoothing_sigma, obs_clipping=True,
                       normalize_flux=self.normalize_flux, normalize_total_flux=self.normalize_total_flux, 
                       normalize_mean_flux=self.normalize_mean_flux, normalize_f750=self.normalize_f750,
-                      veil_flux = veil_flux, extinct_flux = extinct_flux, random_seed = param_seed, 
+                      veil_flux = veil_flux, extinct_flux = extinct_flux, random_seed = param_seed, dummy_slab=dummy_slab,
                       )
  
         test_split = int(self.test_frac * len(all_x))
@@ -430,16 +462,37 @@ class DataLoader(cINNConfig):
         all_y = torch.Tensor(all_y)
         
         torch.manual_seed(seed)
-        
         pin_memory = torch.cuda.is_available()
-        test_loader = torch.utils.data.DataLoader(
-                torch.utils.data.TensorDataset(all_x[:test_split], all_y[:test_split]),
-                batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory, num_workers=get_num_workers())
-             
-        train_loader = torch.utils.data.DataLoader(
-            torch.utils.data.TensorDataset(all_x[test_split:], all_y[test_split:]),
-            batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory,  num_workers=get_num_workers())
         
+        
+        if self.cond_net_code=="hybrid_cnn":
+            # Need to divide spec_data (for cnn) and global_data (for global_net)
+            roi_spec = self.exp.get_spec_index(self.y_names, get_loc=True, use_bool=True)
+            if self.prenoise_training==True:
+                # divide y and sigma in axis=1
+                all_y_3d = all_y.reshape(-1, 2, len(self.y_names)) 
+                spec_data = all_y_3d[:, :, roi_spec] # (Models, channel, spectral points)
+                global_data = all_y_3d[:, :, np.invert(roi_spec)].reshape(all_y.shape[0], -1) # (Models, global params, including their noises)
+            else:
+                spec_data = (all_y[:, roi_spec])[:,None,:]
+                global_data = (all_y[:, np.invert(roi_spec)])[:,None,:]
+                
+            test_loader = torch.utils.data.DataLoader(
+                    torch.utils.data.TensorDataset(all_x[:test_split], spec_data[:test_split], global_data[:test_split]),
+                    batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory, num_workers=get_num_workers())
+            
+            train_loader =  torch.utils.data.DataLoader(
+                torch.utils.data.TensorDataset(all_x[test_split:], spec_data[test_split:], global_data[test_split:]),
+                batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory,  num_workers=get_num_workers())
+
+        else: # fully connected network. basic cond_net
+            test_loader = torch.utils.data.DataLoader(
+                    torch.utils.data.TensorDataset(all_x[:test_split], all_y[:test_split]),
+                    batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory, num_workers=get_num_workers())
+                 
+            train_loader = torch.utils.data.DataLoader(
+                torch.utils.data.TensorDataset(all_x[test_split:], all_y[test_split:]),
+                batch_size=batch_size, shuffle=True, drop_last=True, pin_memory=pin_memory,  num_workers=get_num_workers())
         
         
         return test_loader, train_loader
