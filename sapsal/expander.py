@@ -198,6 +198,7 @@ def cardelli_extinction(wave, Av, Rv):
     # this function, while you should divide by it in the case you want to deredden it.
     
     # here Av and Rv should be scalr values -> 2025.07.13: changed. Av and Rv can be scalar or 1D array.
+    # wave must be 1D array
 
     #ebv = Av/Rv
 
@@ -589,8 +590,6 @@ def assign_slab_grid(slab_grid_file, params, x_names, y_names, random_seed=0):
     
     return params, slab_norm
 
-
-    
     
 
 
@@ -778,27 +777,42 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
             sig = astro.unc_to_sig(unc)
             y_it = np.hstack((y_it, sig))
     
-    if astro.use_flag == True:
-        if flag.shape[-1] == len(astro.flag_names):
-            if len(flag.shape)==1:
-                flag2d = flag.reshape(1,-1)
-                y2d = y_it.reshape(1,-1)
-            else:
-                flag2d = flag
-                y2d = y_it
+    
+    if astro.cond_net_code=="hybrid_cnn": # feature should be tuple
+        # Need to divide spec_data (for cnn) and global_data (for global_net)
+        roi_spec = get_spec_index(astro.y_names, get_loc=True, use_bool=True)
+        if astro.prenoise_training==True:
+            # divide y and sigma in axis=1
+            y_3d = y_it.reshape(-1, 2, len(astro.y_names)) 
+            spec_data = y_3d[:, :, roi_spec] # (Models, channel, spectral points)
+            global_data = y_3d[:, :, np.invert(roi_spec)].reshape(y_3d.shape[0], -1) # (Models, global params, including their noises)
+        else:
+            spec_data = (y_it[:, roi_spec])[:,None,:]
+            global_data = (y_it[:, np.invert(roi_spec)])[:,None,:]
+        
+        y_it = (spec_data, global_data)
+    
+    # if astro.use_flag == True:
+    #     if flag.shape[-1] == len(astro.flag_names):
+    #         if len(flag.shape)==1:
+    #             flag2d = flag.reshape(1,-1)
+    #             y2d = y_it.reshape(1,-1)
+    #         else:
+    #             flag2d = flag
+    #             y2d = y_it
 
-            for i_flag, flag_name in enumerate(astro.flag_names):
-                roi_off = flag2d[:, i_flag] == 0.0
-                y2d[roi_off][:,astro.flag_index_dic[flag_name]] = 0.0
+    #         for i_flag, flag_name in enumerate(astro.flag_names):
+    #             roi_off = flag2d[:, i_flag] == 0.0
+    #             y2d[roi_off][:,astro.flag_index_dic[flag_name]] = 0.0
 
-            rf = astro.flag_to_rf(flag2d)
-            y_it = np.hstack((y2d, rf))
+    #         rf = astro.flag_to_rf(flag2d)
+    #         y_it = np.hstack((y2d, rf))
 
-    if astro.wavelength_coupling == True:
-        wl = get_coupling_wavelength(astro.y_names)
-        if len(y.shape)>1: 
-            wl = np.repeat(wl.reshape(1,-1), y.shape[0], axis=0)
-        y_it = np.hstack( (y_it, astro.wl_to_lambda(wl)))
+    # if astro.wavelength_coupling == True:
+    #     wl = get_coupling_wavelength(astro.y_names)
+    #     if len(y.shape)>1: 
+    #         wl = np.repeat(wl.reshape(1,-1), y.shape[0], axis=0)
+    #     y_it = np.hstack( (y_it, astro.wl_to_lambda(wl)))
 
             
     
@@ -812,49 +826,164 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
     else:
         return astro.x_to_params(output)
     
-GPU_MAX_LOAD = 0.5         # Maximum compute load of GPU allowed in automated selection
-GPU_MAX_MEMORY = 0.5         # Maximum memory load of GPU allowed in automated selection
+
+MIN_FREE_MEMORY_MIB = None  # Minimum available VRAM in MiB. 
+GPU_MAX_LOAD = 0.4         # Maximum compute load of GPU allowed in automated selection
+GPU_MAX_MEMORY = 0.4         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
 
-def find_gpu_available(gpu_max_load=GPU_MAX_LOAD, gpu_max_memory=GPU_MAX_MEMORY,
-                       gpu_wait_s=GPU_WAIT_S, gpu_attempts=GPU_ATTEMPTS,
-                       gpu_exclude_ids=GPU_EXCLUDE_IDS, verbose=True,
-                       return_str=True, return_list=False):
+# def find_gpu_available(gpu_max_load=GPU_MAX_LOAD, gpu_max_memory=GPU_MAX_MEMORY,
+#                        gpu_wait_s=GPU_WAIT_S, gpu_attempts=GPU_ATTEMPTS,
+#                        gpu_exclude_ids=GPU_EXCLUDE_IDS, verbose=True,
+#                        return_str=True, return_list=False):
+#     """
+#     Find and return available gpu. Only use this function if you have GPU
+
+#     Parameters
+#     ----------
+#     return_str : bool, optional
+#         get full str -> cuda:1  The default is True.
+#     return_list : bool, optional
+#         get full list of avaibable gpus [1,3,4]. The default is False.
+
+#     Returns
+#     -------
+#     str or list or int
+#         information of GPU available.
+
+#     """
+#     try:
+#         import GPUtil
+#         device_id_list = GPUtil.getFirstAvailable(maxLoad=gpu_max_load,
+#                                                   maxMemory=gpu_max_memory,
+#                                                   attempts=gpu_attempts,
+#                                                   interval=gpu_wait_s,
+#                                                   excludeID=gpu_exclude_ids,
+#                                                   verbose=verbose)
+#         if return_str:
+#             return 'cuda:{:d}'.format(device_id_list[0])
+#         elif return_list:
+#             return device_id_list
+#         else:
+#             return device_id_list[0]
+#     except Exception as e:
+#         print(e)
+    
+
+
+# New version
+def find_gpu_available(min_free_memory_mib=MIN_FREE_MEMORY_MIB, gpu_max_memory=GPU_MAX_MEMORY,
+                       gpu_max_load=GPU_MAX_LOAD, gpu_wait_s=GPU_WAIT_S, gpu_attempts=GPU_ATTEMPTS,
+                       gpu_exclude_ids=GPU_EXCLUDE_IDS, verbose=True, return_list=False):
     """
-    Find and return available gpu. Only use this function if you have GPU
+    Find and return an available GPU.
+    If min_free_memory_mib is set, it takes precedence for the search.
+    Otherwise, gpu_max_memory (percentage) is used.
 
     Parameters
     ----------
-    return_str : bool, optional
-        get full str -> cuda:1  The default is True.
+    min_free_memory_mib : int or None, optional
+        Minimum available VRAM in MiB. Default is None.
+    gpu_max_memory : float, optional
+        Maximum allowed VRAM usage ratio (0.0~1.0). Default is 0.1 (10%).
+    gpu_max_load : float, optional
+        Maximum allowed GPU core load. Default is 0.1 (10%).
+    gpu_wait_s : int, optional
+        Time to wait in seconds before retrying if no GPU is found. Default is 5s.
+    gpu_attempts : int, optional
+        Maximum number of retry attempts. Default is 10.
+    gpu_exclude_ids : list, optional
+        List of physical GPU IDs to explicitly exclude. Default is [].
+    verbose : bool, optional
+        Whether to print progress. Default is True.
     return_list : bool, optional
-        get full list of avaibable gpus [1,3,4]. The default is False.
+        Whether to return a list of all available GPU IDs. Default is False.
 
     Returns
     -------
-    str or list or int
-        information of GPU available.
-
+    str, list, or None
+        Information of the available GPU or None if not found.
     """
-    try:
-        import GPUtil
-        device_id_list = GPUtil.getFirstAvailable(maxLoad=gpu_max_load,
-                                                  maxMemory=gpu_max_memory,
-                                                  attempts=gpu_attempts,
-                                                  interval=gpu_wait_s,
-                                                  excludeID=gpu_exclude_ids,
-                                                  verbose=verbose)
-        if return_str:
-            return 'cuda:{:d}'.format(device_id_list[0])
-        elif return_list:
-            return device_id_list
-        else:
-            return device_id_list[0]
-    except Exception as e:
-        print(e)
+    import GPUtil
+    import time
+    # Get the value of the CUDA_VISIBLE_DEVICES environment variable
+    cuda_visible_str = os.environ.get('CUDA_VISIBLE_DEVICES')
     
+    # Get physical GPU IDs from CUDA_VISIBLE_DEVICES
+    physical_gpus_from_cuda = None
+    if cuda_visible_str:
+        try:
+            physical_gpus_from_cuda = [int(i.strip()) for i in cuda_visible_str.split(',')]
+        except ValueError:
+            print("Warning: The CUDA_VISIBLE_DEVICES environment variable is invalid. Searching all GPUs.")
+            physical_gpus_from_cuda = None
+    
+    # Combine user-provided and CUDA_VISIBLE_DEVICES exclusions
+    final_excluded_ids = set(gpu_exclude_ids)
+    if physical_gpus_from_cuda is not None:
+        all_gpus = {gpu.id for gpu in GPUtil.getGPUs()}
+        ids_not_in_cuda = all_gpus - set(physical_gpus_from_cuda)
+        final_excluded_ids.update(ids_not_in_cuda)
+    
+    for attempt in range(gpu_attempts):
+        if verbose:
+            print(f"[{attempt + 1}/{gpu_attempts}] Searching for an available GPU...")
+
+        gpus = GPUtil.getGPUs()
+        available_gpus = []
+
+        for gpu in gpus:
+            # Skip GPUs in the final exclusion list
+            if gpu.id in final_excluded_ids:
+                continue
+            
+            # Determine GPU availability based on memory and load
+            is_available = False
+            # If min_free_memory_mib is set, this condition takes precedence
+            if min_free_memory_mib is not None:
+                if gpu.memoryFree >= min_free_memory_mib and gpu.load < gpu_max_load:
+                    is_available = True
+            # If min_free_memory_mib is not set, use the percentage condition
+            elif (gpu.memoryUsed / gpu.memoryTotal) < gpu_max_memory and gpu.load < gpu_max_load:
+                is_available = True
+
+            if is_available:
+                available_gpus.append(gpu.id)
+
+        if available_gpus:
+            if verbose:
+                print(f"Found available physical GPU IDs: {available_gpus}")
+            
+            # Remap the physical ID to the correct CUDA runtime index
+            if physical_gpus_from_cuda is not None:
+                physical_id = available_gpus[0]
+                cuda_index = physical_gpus_from_cuda.index(physical_id)
+                if verbose:
+                    print(f"Physical GPU ID {physical_id} is mapped to 'cuda:{cuda_index}' in the CUDA runtime.")
+                
+                if not return_list:
+                    return f'cuda:{cuda_index}'
+                
+                re_mapped_list = [physical_gpus_from_cuda.index(p_id) for p_id in available_gpus]
+                return re_mapped_list
+
+            else:
+                # If CUDA_VISIBLE_DEVICES is not set, use the physical ID directly
+                if not return_list:
+                    return f'cuda:{available_gpus[0]}'
+                return available_gpus
+        
+        # If no available GPU is found, wait and retry
+        if verbose:
+            print(f"No available GPU found. Retrying in {gpu_wait_s} seconds.")
+        time.sleep(gpu_wait_s)
+
+    # If all attempts fail
+    if verbose:
+        print("Maximum number of attempts exceeded. No available GPU.")
+    return None
     
 
 """
@@ -1065,6 +1194,7 @@ title_unit_dic = {
     'logG': r'log g (cm s$^{-2}$)',
     'A_V': r'A$_{\mathrm{V}}$ (mag)',
     'veil_r': r'r$_{\mathrm{veil}}$',
+    'log_veil_r': r'log r$_{\mathrm{veil}}$',
     'library': 'Library',
     "R_V": r'R$_{\mathrm{V}}$',
     
@@ -1086,6 +1216,7 @@ title_dic = {
     'A_V': r'A$_{\mathrm{V}}$',
     'library': 'Library',
     'veil_r': r'r$_{\mathrm{veil}}$',
+    'log_veil_r': r'log r$_{\mathrm{veil}}$',
     "R_V": r'R$_{\mathrm{V}}$',
     
     # slab parameters
@@ -1126,13 +1257,23 @@ def get_title(key, unit=True):
 """
 Useful functions for analysis
 """
-def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True,
+def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True, x_names=None,
                           add_Teff=False, spt_scale=None, return_percentile=False, add_veil=False,
                           ):
                           # exclude_infinite=True, exclude_unphysical=False, **kwarg):
     
     parameter_distr = parameter_distr.copy()
     npost = len(parameter_distr)
+    
+    if x_names is not None:
+        # check dimension 
+        if parameter_distr.shape[1] != len(x_names):
+            raise ValueError("posterior and x_names dimension mismatch")
+        param_names = x_names
+    else:
+        param_names = c.x_names.copy()
+        
+    n_param = len(param_names)
     
     # if exclude_unphysical:
     #     roi_physical = exclude_models(parameter_distr, astro, exclude_infinite=exclude_infinite,
@@ -1158,10 +1299,10 @@ def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True,
         confidence *= 1e-2
     
     if add_Teff:
-        if 'logTeff' not in c.x_names:
+        if 'logTeff' not in param_names:
             add_Teff = False
     if add_veil:
-        if 'log_veil_r' not in c.x_names:
+        if 'log_veil_r' not in param_names:
             add_veil = False
 
     unc_list = []
@@ -1170,25 +1311,25 @@ def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True,
         q_low  = 100. * 0.5 * (1 - confidence)
         q_high = 100. * 0.5 * (1 + confidence)    
         
-        for i, param in enumerate(c.x_names): 
+        for i, param in enumerate(param_names):
             x_low, x_high = np.nanpercentile(parameter_distr[:, i], [q_low, q_high])
             unc_list.append(x_high - x_low)
             per_list.append([x_low, x_high])
             
         if add_Teff:
-            i_logTeff = c.x_names.index('logTeff')
+            i_logTeff = param_names.index('logTeff')
             x_low, x_high = np.nanpercentile(parameter_distr[:, i_logTeff], [q_low, q_high])
             unc_list.append( 10**x_high - 10** x_low)
             per_list.append([10**x_low, 10**x_high])
             
         if add_veil:
-            i_logr = c.x_names.index('log_veil_r')
+            i_logr = param_names.index('log_veil_r')
             x_low, x_high = np.nanpercentile(parameter_distr[:, i_logr], [q_low, q_high])
             unc_list.append( 10**x_high - 10** x_low)
             per_list.append([10**x_low, 10**x_high])
     else:
-        unc_list = [np.nan]*len(c.x_names)
-        per_list = [[np.nan,np.nan]]*len(c.x_names)
+        unc_list = [np.nan]*len(param_names)
+        per_list = [[np.nan,np.nan]]*len(param_names)
         if add_Teff:
             unc_list.append(np.nan)
             per_list.append([[np.nan,np.nan]])
@@ -1436,6 +1577,7 @@ def plot_posterior(posterior, axis, c, x_names = None,
     if (u68_given is False):
         if calculate_u68*text_u68:
             u68_values = calculate_uncertainty(posterior, c, confidence=68, percent=True,
+                         x_names=param_names,
                           add_Teff=bool('logTeff' in param_names) )
             u68_given = True
             
