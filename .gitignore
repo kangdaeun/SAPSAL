@@ -2,6 +2,7 @@
 sapsal/Slab_T7_N13_t1_n750.png
 sapsal/Slab_T7_N13_t1_n750.txt
 ess_files/Saliency_map.py
+ess_files/eval_network_veilg0p1.py
 ess_files/feature_importance_multi.py
 ess_files/feature_importance_new.py
 ess_files/frp_resim_Tr14.py
@@ -10,7 +11,7 @@ ess_files/eval_Rv_depence_models.py
 networks/SpD_TGARL_Noise_mMUSE/SpD_TGARL_Noise_mMUSE.pt
 networks/SpD_TGARL_Noise_mMUSE/__pycache__/
 networks/Stl_TGA_tpl/Stl_TGA_tpl.pt
-setup_notready.py
+
 
 
 # macOS 시스템 파일
