@@ -274,7 +274,7 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                                           dtype={'names':loss_header, 'formats':loss_format} )
         epoch_loss_history['Epoch'] = np.arange(max_epoch)
         
-        
+    
         # check resume
         if resume==True:
             # check if checkpoint is saved
@@ -294,7 +294,8 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
             try:
                 model.load(checkpoint_filename, device=c.device)
                 print("Loaded from checkpoint (%s)"%checkpoint_filename)
-            except:
+            except #Exception as e:
+                #print(e)
                 resume = False
         else:
             resume=False

@@ -165,7 +165,7 @@ def calculate_z(model, astro, smoothing=True):
             global_data = y_3d[:, :, np.invert(roi_spec)].reshape(y_test.shape[0], -1) # (Models, global params, including their noises)
         else:
             spec_data = (y_test[:, roi_spec])[:,None,:]
-            global_data = (y_test[:, np.invert(roi_spec)])[:,None,:]
+            global_data = (y_test[:, np.invert(roi_spec)]).reshape(y_test.shape[0], -1)
         
         yT = (torch.Tensor(spec_data).to(astro.device), torch.Tensor(global_data).to(astro.device))
     else:
