@@ -15,8 +15,8 @@ from time import time
 # # from cINN.test_execute import train_network
 
 MIN_FREE_MEMORY_MIB = None  # Minimum available VRAM in MiB. 
-GPU_MAX_LOAD = 0.6           # Maximum compute load of GPU allowed in automated selection
-GPU_MAX_MEMORY = 0.6         # Maximum memory load of GPU allowed in automated selection
+GPU_MAX_LOAD = 0.15           # Maximum compute load of GPU allowed in automated selection
+GPU_MAX_MEMORY = 0.15         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
@@ -138,17 +138,17 @@ if __name__ == '__main__':
         train_network(c, data=astro, max_epoch=MAX_EPOCH, resume=resume) # now train_prenoise_network is combined with train_network
     elif c.use_flag == True:
         from sapsal.execute import train_flag_network
-        train_flag_network(c, data=astro, max_epoch=MAX_EPOCH)
+        train_flag_network(c, data=astro, max_epoch=MAX_EPOCH, resume=resume)
     elif c.wavelength_coupling == True:
         from sapsal.execute import train_wc_network
-        train_wc_network(c, data=astro, max_epoch=MAX_EPOCH)
+        train_wc_network(c, data=astro, max_epoch=MAX_EPOCH, resume=resume)
     else:
         if c.domain_adaptation:
             if c.da_without_discriminator:
                 from sapsal.execute import train_network_DAwoD
-                train_network_DAwoD(c, data=astro, max_epoch=MAX_EPOCH)
+                train_network_DAwoD(c, data=astro, max_epoch=MAX_EPOCH, resume=resume)
         else:
-            train_network(c, data=astro, max_epoch=MAX_EPOCH)
+            train_network(c, data=astro, max_epoch=MAX_EPOCH, resume=resume)
     
     print("Finished training: %s"%config_file)
 
