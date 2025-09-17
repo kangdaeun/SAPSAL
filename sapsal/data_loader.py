@@ -217,7 +217,36 @@ class DataLoader(cINNConfig):
                     # possible slab parameters = ['Tslab', 'log_ne', 'log_tau0', 'log_Fslab']
                     all_param, fslab_norm = self.exp.assign_slab_grid(self.slab_grid, all_param, x_names, y_names, random_seed=random_seed)
                     # add veiling effect
-                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=veil_values, fslab_750=fslab_norm)
+                    new_, veiling = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=veil_values, fslab_750=fslab_norm, return_veil=True)
+                    if 'log_veil_r_6200' in x_names or 'veil_r_6200' in x_names:
+                        r_6200 = self.exp.get_flux_at(wl, veiling, 6200.)/self.exp.get_flux_at(wl, all_obs[:,spec_locs], 6200.)
+                        if 'log_veil_r_6200' in x_names:
+                            all_param[:, x_names.index('log_veil_r_6200')] = np.log10(r_6200)
+                        elif 'veil_r_6200' in x_names:
+                            all_param[:, x_names.index('veil_r_6200')] = r_6200
+                    if 'log_veil_r_9150' in x_names or 'veil_r_9150' in x_names:
+                        r_9150 = self.exp.get_flux_at(wl, veiling, 9150.)/self.exp.get_flux_at(wl, all_obs[:,spec_locs], 9150.)
+                        if 'log_veil_r_9150' in x_names:
+                            all_param[:, x_names.index('log_veil_r_9150')] = np.log10(r_9150)
+                        elif 'veil_r_9150' in x_names:
+                            all_param[:, x_names.index('veil_r_9150')] = r_9150
+
+                    if 'log_veil_r_5060' in x_names or 'veil_r_5060' in x_names:
+                        r_5060 = self.exp.get_flux_at(wl, veiling, 5060., n_bins=15)/self.exp.get_flux_at(wl, all_obs[:,spec_locs], 5060., n_bins=15)
+                        if 'log_veil_r_5060' in x_names:
+                            all_param[:, x_names.index('log_veil_r_5060')] = np.log10(r_5060)
+                        elif 'veil_r_5060' in x_names:
+                            all_param[:, x_names.index('veil_r_5060')] = r_5060
+
+                    if 'log_veil_r_6000' in x_names or 'veil_r_6000' in x_names:
+                        r_6000 = self.exp.get_flux_at(wl, veiling, 6000., n_bins=15)/self.exp.get_flux_at(wl, all_obs[:,spec_locs], 6000., n_bins=15)
+                        if 'log_veil_r_6000' in x_names:
+                            all_param[:, x_names.index('log_veil_r_6000')] = np.log10(r_6000)
+                        elif 'veil_r_6000' in x_names:
+                            all_param[:, x_names.index('veil_r_6000')] = r_6000
+                    
+                    all_obs[:, spec_locs] = new_
+                    # all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=veil_values, fslab_750=fslab_norm)
                 else:
                     raise ValueError("Invalid configuration: use_Hslab_veiling=True & use_one_slab_grid!=True, but slab_grid is not specified.")
             else:
@@ -475,7 +504,7 @@ class DataLoader(cINNConfig):
                 global_data = all_y_3d[:, :, np.invert(roi_spec)].reshape(all_y.shape[0], -1) # (Models, global params, including their noises)
             else:
                 spec_data = (all_y[:, roi_spec])[:,None,:]
-                global_data = (all_y[:, np.invert(roi_spec)])[:,None,:]
+                global_data = (all_y[:, np.invert(roi_spec)]).reshape(all_y.shape[0], -1)
                 
             test_loader = torch.utils.data.DataLoader(
                     torch.utils.data.TensorDataset(all_x[:test_split], spec_data[:test_split], global_data[:test_split]),

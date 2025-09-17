@@ -426,6 +426,29 @@ def get_f750(wl, fl):
 
     else:
         raise ValueError("fl must be 1D or 2D numpy array")
+    
+
+def get_flux_at(wl, fl, target_wl, n_bins = 3):
+    """
+    wl: 1D array. apply to all obs
+    fl: 1D array (one spec) or  2D array (N_obs)
+    target_wl: scalar wavelength value to get flux at this wavelength
+
+    """
+    id_target = np.abs(wl - target_wl).argmin()
+    n_bins = int(n_bins)
+
+    if fl.ndim == 1:
+        return np.nanmedian(fl[id_target - n_bins:id_target + n_bins]) 
+
+    elif fl.ndim == 2:
+        sub_fl = fl[:, id_target - n_bins:id_target + n_bins]  # shape (N, 6)
+        sorted_sub = np.sort(sub_fl, axis=1)
+        median_vals = 0.5 * (sorted_sub[:, n_bins-1] + sorted_sub[:, n_bins])
+        return median_vals
+
+    else:
+        raise ValueError("fl must be 1D or 2D numpy array")
 
 
 
@@ -622,7 +645,7 @@ def read_realdatabase(tablename, y_names, s_names=None): # read and only return 
  SpT related functions
 """
 # SpT - SpT index 
-def convert_spt_to_num(spt):
+def convert_spt_to_num(spt, out_nan=False):
     if 'M' in spt:
         return float(spt[1:])+8 # K type: K0 ~ K7
     elif 'K' in spt:
@@ -639,9 +662,12 @@ def convert_spt_to_num(spt):
         return float(spt[1:])-50
     else:
         print("No matching")
-        return None
+        if out_nan:
+            return np.nan
+        else:
+            return None
                     
-def convert_sptnum_to_spt(spt):
+def convert_sptnum_to_spt(spt, out_nan=False):
     if spt >=8:
         return 'M'+str(spt-8)
     elif spt <8 and spt >=0:
@@ -658,7 +684,10 @@ def convert_sptnum_to_spt(spt):
         return 'O'+str(spt+50)
     else:
         print("No matching")
-        return None
+        if out_nan:
+            return np.nan
+        else:
+            return None
         
 
 module_path = os.path.dirname(os.path.abspath(__file__))
@@ -676,6 +705,9 @@ for key, name in spt_option_dic.items():
     spt_desc_dic[key] = "%s (%s - %s)"%(key, early, late)
 
 def convert_temp_to_sptnum(teff, option='Tpl', out_nan=False):
+
+    if teff is None or teff == np.nan:
+        return np.nan
 
     key = spt_option_dic[option]
       
@@ -711,6 +743,9 @@ def convert_temp_to_sptnum(teff, option='Tpl', out_nan=False):
 
 
 def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=False):
+    if sptnum is None or sptnum == np.nan:
+        return np.nan
+
     key = spt_option_dic[option]
 
     ref_temp = spt_convert_table[key]
@@ -744,9 +779,9 @@ def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=False):
     return temp
 
 def convert_spt_to_temp(spt, option='Tpl', out_nan=False):
-    return convert_sptnum_to_temp( convert_spt_to_num(spt), option=option, out_nan=out_nan )
+    return convert_sptnum_to_temp( convert_spt_to_num(spt, out_nan=out_nan), option=option, out_nan=out_nan )
 def convert_temp_to_spt(temp, option='Tpl', out_nan=False):
-    return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan))
+    return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan), out_nan=out_nan)
 
 # upgraded version
 def make_spt(only_int=False, option='Tr14'):
@@ -788,7 +823,7 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
             global_data = y_3d[:, :, np.invert(roi_spec)].reshape(y_3d.shape[0], -1) # (Models, global params, including their noises)
         else:
             spec_data = (y_it[:, roi_spec])[:,None,:]
-            global_data = (y_it[:, np.invert(roi_spec)])[:,None,:]
+            global_data = (y_it[:, np.invert(roi_spec)]).reshape(y_it.shape[0], -1)
         
         y_it = (spec_data, global_data)
     
@@ -828,8 +863,8 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
     
 
 MIN_FREE_MEMORY_MIB = None  # Minimum available VRAM in MiB. 
-GPU_MAX_LOAD = 0.4         # Maximum compute load of GPU allowed in automated selection
-GPU_MAX_MEMORY = 0.4         # Maximum memory load of GPU allowed in automated selection
+GPU_MAX_LOAD = 0.5         # Maximum compute load of GPU allowed in automated selection
+GPU_MAX_MEMORY = 0.5         # Maximum memory load of GPU allowed in automated selection
 GPU_WAIT_S = 600             # Time (s) to wait between tries to find a free GPU if none was found
 GPU_ATTEMPTS = 10            # Number of times to retry finding a GPU if none was found
 GPU_EXCLUDE_IDS = [] # List of GPU IDs that are to be ignored when trying to find a free GPU, leave as empty list if none
