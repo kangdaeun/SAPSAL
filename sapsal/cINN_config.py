@@ -686,39 +686,72 @@ class cINNConfig():
         except Exception as e:
             sys.exit(e)
             
+    def parse_from_file(self, file):
+        text = open(file, 'r').read()
+        # Remove comments to avoid confusions
+        text = re.sub(r'("""|\'\'\')(.*?)\1', '', text, flags=re.DOTALL)
+        
+        lines = text.split('\n')
+        # remove any line starts with #
+        config_lines = []
+        for line in lines:
+            stripped = line.split('#')[0].rstrip()  # # 이후 삭제
+            if stripped:  # 빈 줄은 제외
+                config_lines.append(stripped)
+        
+        # find line with = : start line of varaiable definition
+        i_def_line = np.where( np.array([("=" in comp) and (len(comp.split('='))==2) for comp in config_lines]))[0]
+        
+        parse_dic = {}
+        for j, ind in enumerate(i_def_line):
+            # ind is the start of definition. Find varaible name 
+            name = config_lines[ind].split('=')[0].replace(' ', '')
+            # collect all data from ind to before i_def_line[j+1]
+            if j==len(i_def_line)-1:
+                data_lines = config_lines[ind:]
+            else:
+                data_lines = config_lines[ind: i_def_line[j+1]]
+            data_list = [ config_lines[ind].split('=')[1] ]
+            if len(data_lines)>1:
+                for dd in data_lines[1:]:
+                    data_list.append(dd)
+            data_str = '\n'.join(data_list)
             
-    def find_str_names(self, config_file, dim_max=20):
+            parse_dic[name] = data_str
+        return parse_dic
+            
+    # def find_str_names(self, config_file, dim_max=20):
     
-        n_x = len(self.x_names); n_y = len(self.y_names)
-        if n_x <= dim_max and n_y <= dim_max:
-            return None, None
-        else:
-            with open(config_file, 'r') as f:
-                text = f.read()
+    #     n_x = len(self.x_names); n_y = len(self.y_names)
+    #     if n_x <= dim_max and n_y <= dim_max:
+    #         return None, None
+    #     else:
+    #         with open(config_file, 'r') as f:
+    #             text = f.read()
         
-            # Remove comments to avoid confusions
-            text = re.sub(r'("""|\'\'\')(.*?)\1', '', text, flags=re.DOTALL)
+    #         # Remove comments to avoid confusions
+    #         text = re.sub(r'("""|\'\'\')(.*?)\1', '', text, flags=re.DOTALL)
         
-            lines = text.split('\n')
-            config_components = []
-            for line in lines:
-                stripped = line.split('#')[0].rstrip()  # # 이후 삭제
-                if stripped:  # 빈 줄은 제외
-                    config_components.append(stripped)
+    #         lines = text.split('\n')
+    #         config_components = []
+    #         for line in lines:
+    #             stripped = line.split('#')[0].rstrip()  # # 이후 삭제
+    #             if stripped:  # 빈 줄은 제외
+    #                 config_components.append(stripped)
             
-            if n_x > dim_max:
-                i_comp = np.where( np.array([("x_names" in comp) and ("#" not in comp) for comp in config_components]))[0][0]
-                str_x_names = config_components[i_comp].split("=")[-1].strip()
-            else:
-                str_x_names = None
+    #         if n_x > dim_max:
+    #             i_comp = np.where( np.array([("x_names" in comp) and ("#" not in comp) for comp in config_components]))[0][0]
+    #             str_x_names = config_components[i_comp].split("=")[-1].strip()
+    #         else:
+    #             str_x_names = None
                 
-            if n_y > dim_max:
-                i_comp = np.where( np.array([("y_names" in comp) and ("#" not in comp) for comp in config_components]))[0][0]
-                str_y_names = config_components[i_comp].split("=")[-1].strip()
-            else:
-                str_y_names = None
+    #         if n_y > dim_max:
+    #             i_comp = np.where( np.array([("y_names" in comp) and ("#" not in comp) for comp in config_components]))[0][0]
+    #             str_y_names = config_components[i_comp].split("=")[-1].strip()
+    #         else:
+    #             str_y_names = None
                 
-            return str_x_names, str_y_names
+    #         return str_x_names, str_y_names
                 
     
     
@@ -770,13 +803,17 @@ class cINNConfig():
        
         # get string from config_file
         if use_str_names==True:
-            str_x_names, str_y_names = self.find_str_names(self.config_file)
+            # str_x_names, str_y_names = self.find_str_names(self.config_file)
+            parse_dic = self.parse_from_file(self.config_file)
+            str_x_names = parse_dic.get('x_names', None)
+            str_y_names = parse_dic.get('y_names', None)
             
         if str_x_names == None:
             # contents.append( "x_names = [\n\t'%s'\n]"%("' ,\n\t'".join(self.x_names))  )
             contents.append(format_list("x_names", self.x_names, max_items_per_line=5))
         else:
             contents.append( "x_names = %s"%(str_x_names) )
+        new_line(contents)
     
         if str_y_names == None:
             # contents.append( "y_names = [\n\t'%s'\n]"%("' ,\n\t'".join(self.y_names))  )

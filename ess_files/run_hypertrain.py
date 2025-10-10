@@ -218,10 +218,12 @@ def make_random_config(c_ref, n):
                                 adjust_gamma_n_epoch=True)                         
     
     # write and save config
-    str_x_names, str_y_names = tools.find_str_names(c_ref, c_ref.config_file, dim_max=20)
+    # str_x_names, str_y_names = tools.find_str_names(c_ref, c_ref.config_file, dim_max=20)
     config.save_config(config_file = config_path_n,
                          config_comment = "Hypermaramter search: %i"%n,
-                          str_x_names = str_x_names, str_y_names=str_y_names, verbose=False )
+                         use_str_names = True,
+                        #   str_x_names = str_x_names, str_y_names=str_y_names,
+                            verbose=False )
     config.config_file = config_path_n
     # update config table
     update_config_table(config, n)
