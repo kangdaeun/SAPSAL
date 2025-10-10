@@ -26,8 +26,49 @@ def read_database(tablename):
     # whole_table = ascii.read( tablename, delimiter="\t", format="commented_header")    
     return whole_table
 
+def get_flux_loc(y_names, use_bool=False):
+    def is_float(s):
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
+        
+    flux_loc = np.array([i for i, k in enumerate(y_names) if k.startswith('f') and is_float(k[1:])])
+    flux_loc_bool = np.array([k.startswith('f') and is_float(k[1:]) for k in y_names]) # True/False with len(y_names)
+    if use_bool:
+        return flux_loc_bool
+    else:
+        return flux_loc
 
-def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic={}, f_max_dic={}):
+def get_spec_names_for_flux(y_names, wl, dwl=10):
+   
+    def is_float(s):
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
+        
+    flux_wl = np.array([float(k[1:]) for k in y_names if k.startswith('f') and is_float(k[1:])])
+
+    spec_names = []
+    for i, wl0 in enumerate(flux_wl):
+        # id0 = np.abs(wl - wl0).argmin()
+        id_min = np.abs(wl -(wl0 - dwl)).argmin()
+        id_max = np.abs(wl -(wl0 + dwl)).argmin()
+        spec_names.append( ['l{:d}'.format(k) for k in range(id_min, id_max+1)] )
+
+    return spec_names
+
+def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic={}, f_max_dic={}, wl=None):
+
+    def is_float(s):
+        try:
+            float(s)
+            return True
+        except ValueError:
+            return False
     
     np.random.seed(int(random_seed))
     N = len(table)
@@ -35,9 +76,23 @@ def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_
 
     rparams = set(random_parameters.keys()) if random_parameters else set()
 
+    # Check if network is using spectral flux (l0,l1,l2...) or certain flux values (f7500, f4600...)
+    # Currenlty either option is possible (i.e. spectra or flux)
+    # if there is no spectral index (l0, l1...) then it is not using spectra, instead flux
+    spec_indices = get_spec_index(y_names)
+    if len(spec_indices) == 0: # using flux instead of spectra
+        # generate spec_indices needed for these flux values (always +- 10A. always assuming wl in AA)
+        spec_names_nested = get_spec_names_for_flux(y_names, wl, dwl=10)
+        spec_names = [item for sublist in spec_names_nested for item in sublist] # flatten
+
+    elif len([k for k in y_names if k.startswith('f') and is_float(k[1:])]) > 0:
+        sys.exit("Using both spectra (l0,l1..) and flux values (f7500...) in one network is not possible") # using spectra but some  flux
+    # else: # using only spectra
+        
+
     # 전체 param/spec을 NaN으로 초기화
     params = np.full((N, len(x_names)), np.nan)#, dtype=np.float32)
-    spec = np.full((N, len(y_names)), np.nan)#, dtype=np.float32)
+    obs = np.full((N, len(y_names)), np.nan)#, dtype=np.float32)
 
     # === X 처리 ===
     for i, param in enumerate(x_names):
@@ -56,12 +111,22 @@ def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_
             mini, maxi = random_parameters[param]
             f_min = f_min_dic.get(param, 0.)
             f_max = f_max_dic.get(param, 0.)
-            spec[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max)
+            obs[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max)
         elif param in table_cols:
-            spec[:, i] = table[param].values
+            obs[:, i] = table[param].values
         # else: 그대로 nan
 
-    return (params, spec)
+    if len(spec_indices) == 0: # using flux instead of spectra
+        # obs is filled with NaN except for random values
+        # use temp_obs to fill spectral data (this is only used in training)
+        temp_obs = np.full((N, len(spec_names)), np.nan) # spec_names: ['l0', 'l1',...]
+        for i, name in enumerate(spec_names):
+            if name in table_cols:
+                temp_obs[:, i] = table[name].values
+
+        return (params, (obs, temp_obs))
+    else:
+        return (params, obs)
 
 
 # def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic=None, f_max_dic=None,
@@ -580,7 +645,7 @@ def read_slab_grid(slab_grid_file):
     
 
 
-def assign_slab_grid(slab_grid_file, params, x_names, y_names, random_seed=0):
+def assign_slab_grid(slab_grid_file, params, x_names, spec_names, random_seed=0):
     
     np.random.seed(int(random_seed))
     
@@ -595,8 +660,8 @@ def assign_slab_grid(slab_grid_file, params, x_names, y_names, random_seed=0):
     matched_slab = slab_grid.iloc[slab_idxs].reset_index(drop=True)
     
     # 3. slab_norm 생성
-    spec_y_names = list(np.array(y_names)[get_spec_index(y_names, get_loc=True)])
-    slab_norm = matched_slab[spec_y_names].values
+    # spec_y_names = list(np.array(y_names)[get_spec_index(y_names, get_loc=True)])
+    slab_norm = matched_slab[spec_names].values
     
     # 4. np.nan 위치 중 slab_grid에 있는 값으로 채우기
     slab_cols = set(slab_grid.columns)
@@ -618,12 +683,58 @@ def assign_slab_grid(slab_grid_file, params, x_names, y_names, random_seed=0):
 
 def get_muse_wl():
     return np.arange(4750.1572265625, 9351.4072265625, 1.25) #from f20 (3681)
+
+def get_wl(c): 
+    # get wavelength array for specific network. default is MUSE spec (not specified in additional_kwarg['wl_in_str'])
+    wl_in_str = c.additional_kwarg.get('wl_in_str', None)
+    if wl_in_str is not None:
+        return np.array(eval(wl_in_str))
+    else:
+        return get_muse_wl() # np.arange(4750.1572265625, 9351.4072265625, 1.25) #from f20 (3681)
     
 
-def get_coupling_wavelength(y_names):
-    return get_muse_wl()[np.array([int(k[1:]) for k in y_names])]
-    # wl = get_muse_wl()[np.array([int(i[1:]) for i in y_names])]
-    # return np.repeat(wl.reshape(1,-1), N_data, axis=0)
+
+def make_mask_table(c):
+    """ make mask table (pd.DataFrame) for given config"""
+    spec_ind = get_spec_index(c.y_names)
+    if len(spec_ind)==0:
+        spec_names_nested = get_spec_names_for_flux(c.y_names, wl=get_wl(c), dwl=10)
+        spec_names = [item for sublist in spec_names_nested for item in sublist] # flatten
+        spec_ind = get_spec_index(spec_names)
+    
+    # 'WL_start', 'WL_end' 'ID_start' 'ID_end'
+    wl_array = get_wl(c)
+    n_wl = len(wl_array)
+    i_mask = np.array( [k for k in range(0, n_wl) if k not in spec_ind] )
+    data = []
+    n=0
+    for i, ind in enumerate(i_mask):
+        if i==0:
+            # start
+            i_s = ind; ws = wl_array[i_s]
+
+        if ind > i_s + n: # 1칸 이상 차이
+            # end and save
+            i_e = i_mask[i-1]; we = wl_array[i_e]
+            data.append([ws, we, i_s, i_e])
+            n=0
+            # start
+            i_s = ind; ws = wl_array[i_s]
+    
+        elif ind==(n_wl-1): # end of wl
+            # end and save
+            i_e = ind; we = wl_array[i_e]
+            data.append([ws, we, i_s, i_e])
+        
+        n+=1
+    mask_table = pd.DataFrame(np.array(data), columns=['WL_start', 'WL_end', 'ID_start', 'ID_end']).convert_dtypes()
+    return mask_table
+    
+
+# def get_coupling_wavelength(y_names):
+#     return get_muse_wl()[np.array([int(k[1:]) for k in y_names])]
+#     # wl = get_muse_wl()[np.array([int(i[1:]) for i in y_names])]
+#     # return np.repeat(wl.reshape(1,-1), N_data, axis=0)
     
 # for domain adaptation 
 def read_realdatabase(tablename, y_names, s_names=None): # read and only return usable y bins
@@ -816,6 +927,8 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
     if astro.cond_net_code=="hybrid_cnn": # feature should be tuple
         # Need to divide spec_data (for cnn) and global_data (for global_net)
         roi_spec = get_spec_index(astro.y_names, get_loc=True, use_bool=True)
+        if np.sum(roi_spec)==0:
+            roi_spec = get_flux_loc(astro.y_names, use_bool=True)
         if astro.prenoise_training==True:
             # divide y and sigma in axis=1
             y_3d = y_it.reshape(-1, 2, len(astro.y_names)) 
@@ -1036,10 +1149,12 @@ correlation (correlation between different sigmas in one obs):
                 
 sampling method: gaussian, uniform ([min, max), but exchange=> (min, max] )
 """    
-def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_method=None, y_names=None,
+def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_method=None,
                        lsig_mean=None, lsig_std = None, lsig_min=None, lsig_max=None, 
-                       flux=None, noise_pdf=None,  **kwarg ):
-    # flux: whole spectrum. includ masked area. 
+                       wl = None, y_names=None, flux=None, noise_pdf=None,   **kwarg ):
+    # wl: used in Seg_XX cases (Seg_Flux, Seg_Unif). Wavelength only in use (without masked areas) i.e. len(wl)==size[1]
+    # y_names : only used when 'Seg_' cases or noise_pdf is not None
+    # flux: flux without masked area (only for flux in use). only used when correlation=='Seg_Flux'
     
     if len(size)==1:
         oned = True
@@ -1076,16 +1191,16 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
         lsig += np.repeat(rn.reshape(-1,1), lsig.shape[1], axis=1)
         
     elif 'Seg_' in correlation: 
-        # only for spectral y_components : 'l0','l20', etc,
+        # only for spectral y_components : 'l0','l20', etc, (not for flux values: f7400, f1230, etc)
         # use same sigma for each segment
         # you will get noise_pdf as kwarg if there is non spectral y component
         # this requires: y_names
         
         lsig = np.zeros(size)
         # 1) sample lsig for spectral components
-        spec_indices = get_spec_index(y_names)
+        # spec_indices = get_spec_index(y_names)
         spec_locs = get_spec_index(y_names, get_loc=True)
-        wl = get_muse_wl()[spec_indices]
+        # wl = get_muse_wl()[spec_indices]
         
         iseg_list = divide_wl_segment(wl, **kwarg) # seg_size must be in kwarg, 
         # Don't need to set start and end -> automatically set

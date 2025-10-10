@@ -158,6 +158,8 @@ def calculate_z(model, astro, smoothing=True):
     if astro.cond_net_code=="hybrid_cnn":
         # Need to divide spec_data (for cnn) and global_data (for global_net)
         roi_spec = astro.exp.get_spec_index(astro.y_names, get_loc=True, use_bool=True)
+        if np.sum(roi_spec)==0:
+            roi_spec = astro.exp.get_flux_loc(astro.y_names, use_bool=True)
         if astro.prenoise_training==True:
             # divide y and sigma in axis=1
             y_3d = y_test.reshape(-1, 2, len(astro.y_names)) 

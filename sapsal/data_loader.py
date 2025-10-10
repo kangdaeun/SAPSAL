@@ -149,6 +149,14 @@ class DataLoader(cINNConfig):
         
     def include_expander(self):
         self.exp = self.import_expander()
+
+    # def get_wl(self):  # Now moved to expander
+    #     # get wavelength array for specific network. default is MUSE spec (not specified in additional_kwarg['wl_in_str'])
+    #     wl_in_str = self.additional_kwarg.get('wl_in_str', None)
+    #     if wl_in_str is not None:
+    #         return np.array(eval(wl_in_str))
+    #     else:
+    #         return self.exp.get_muse_wl() # np.arange(4750.1572265625, 9351.4072265625, 1.25) #from f20 (3681)
            
     
     # differce to extract_ is this can preprocess , rescale the data if you want
@@ -186,16 +194,29 @@ class DataLoader(cINNConfig):
             f_min_dic = self.additional_kwarg.get('f_min_dic', {})
             f_max_dic = self.additional_kwarg.get('f_max_dic', {})
             
-        all_param, all_obs = self.exp.divide_xy(self.database, x_names, y_names, 
-                                                random_parameters = self.random_parameters, random_seed=random_seed, 
-                                                f_min_dic = f_min_dic, f_max_dic = f_max_dic,
+        all_param, all_obs = self.exp.divide_xy(self.database, x_names, y_names,
+                                                random_parameters=self.random_parameters, random_seed=random_seed,
+                                                f_min_dic=f_min_dic, f_max_dic=f_max_dic,
+                                                wl=self.exp.get_wl(self), # wl is needed only when using flux values (f1233.5, etc) in y_names instaed of spectra
                                                 )
-        
+        # if using flux: all_obs is in tuple (all_ob, temp_obs)
+        if type(all_obs)==tuple:
+            all_obs, spec = all_obs
+            use_spec = False
+            spec_names_nested = self.exp.get_spec_names_for_flux(y_names, wl=self.exp.get_wl(self), dwl=10)
+            spec_names = [item for sublist in spec_names_nested for item in sublist] # flatten
+            spec_indices = self.exp.get_spec_index(spec_names)
+            spec_locs = self.exp.get_flux_loc(y_names, use_bool=False)
+        else:
+            use_spec = True
+            spec_indices = self.exp.get_spec_index(self.y_names)
+            spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
+            spec = all_obs[:, spec_locs]
+            spec_names = list(np.array(y_names)[spec_locs])
+            
         # 1) Add veiling 
-        spec_indices = self.exp.get_spec_index(self.y_names)
-        spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
         if veil_flux:
-            wl = self.exp.get_muse_wl()[spec_indices]
+            wl = self.exp.get_wl(self)[spec_indices]
             if 'veil_r' in x_names:
                 veil_values = all_param[:, x_names.index("veil_r")]
             elif 'log_veil_r' in x_names:
@@ -203,21 +224,22 @@ class DataLoader(cINNConfig):
             else:
                 raise ValueError("Cannot veil: neither veil_r nor log_veil_r is in x_names.")
             
-            
             # ordinary constant veilnig if use_Hslab_veiling is not True
             if self.use_Hslab_veiling:
                 # not a grid of model but just one
                 if self.use_one_Hslab_model==True: 
                     fslab_norm = self.exp.read_example_slab()[spec_indices]
-                    all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:, spec_locs], veil=veil_values, fslab_750=fslab_norm)
+                    spec = self.exp.add_slab_veil(wl, spec, veil=veil_values, fslab_750=fslab_norm)
+                    # all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:, spec_locs], veil=veil_values, fslab_750=fslab_norm)
                 elif self.slab_grid is not None:
                     # This will make fslab_norm only for corresponding y_names and add slab parameters to predict based on x_names
                     # fslab_norm have N_model x N(spec_locs)
                     # this fills nan values in all_params
                     # possible slab parameters = ['Tslab', 'log_ne', 'log_tau0', 'log_Fslab']
-                    all_param, fslab_norm = self.exp.assign_slab_grid(self.slab_grid, all_param, x_names, y_names, random_seed=random_seed)
+                    all_param, fslab_norm = self.exp.assign_slab_grid(self.slab_grid, all_param, x_names, spec_names, random_seed=random_seed)
                     # add veiling effect
-                    new_, veiling = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=veil_values, fslab_750=fslab_norm, return_veil=True)
+                    new_, veiling = self.exp.add_slab_veil(wl, spec, veil=veil_values, fslab_750=fslab_norm, return_veil=True)
+                    # new_, veiling = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=veil_values, fslab_750=fslab_norm, return_veil=True)
                     if 'log_veil_r_6200' in x_names or 'veil_r_6200' in x_names:
                         r_6200 = self.exp.get_flux_at(wl, veiling, 6200.)/self.exp.get_flux_at(wl, all_obs[:,spec_locs], 6200.)
                         if 'log_veil_r_6200' in x_names:
@@ -245,25 +267,39 @@ class DataLoader(cINNConfig):
                         elif 'veil_r_6000' in x_names:
                             all_param[:, x_names.index('veil_r_6000')] = r_6000
                     
-                    all_obs[:, spec_locs] = new_
+                    spec = new_
                     # all_obs[:, spec_locs] = self.exp.add_slab_veil(wl, all_obs[:,spec_locs], veil=veil_values, fslab_750=fslab_norm)
                 else:
                     raise ValueError("Invalid configuration: use_Hslab_veiling=True & use_one_slab_grid!=True, but slab_grid is not specified.")
             else:
-                all_obs[:, spec_locs] = self.exp.add_veil(wl, all_obs[:, spec_locs], veil=veil_values)
-        
+                spec = self.exp.add_veil(wl, spec, veil=veil_values)
+                # all_obs[:, spec_locs] = self.exp.add_veil(wl, all_obs[:, spec_locs], veil=veil_values)
+           
         # 2) Add extinction
         if extinct_flux:
-            wl = self.exp.get_muse_wl()[spec_indices]
+            wl = self.exp.get_wl(self)[spec_indices]
             if "R_V" in x_names:
                 Rv_array = all_param[:, x_names.index("R_V")]
             elif "R_V" in y_names:
                 Rv_array = all_obs[:, y_names.index("R_V")]
             else:
                 Rv_array = np.array(self.additional_kwarg["R_V"])
-            all_obs[:, spec_locs] = self.exp.extinct_spectrum(wl, all_obs[:, spec_locs], Av_array=all_param[:, x_names.index("A_V")], Rv_array = Rv_array )
+            spec = self.exp.extinct_spectrum(wl, spec, Av_array=all_param[:, x_names.index("A_V")], Rv_array = Rv_array )
+            # all_obs[:, spec_locs] = self.exp.extinct_spectrum(wl, all_obs[:, spec_locs], Av_array=all_param[:, x_names.index("A_V")], Rv_array = Rv_array )
             
-        
+        # 여기서 플럭스 정리
+        if use_spec:
+            all_obs[:, spec_locs] = spec
+        else:
+            # when using flux values
+            # now get median values for each flux values
+            i_start = 0
+            for i, loc in enumerate(spec_locs):
+                # only using relevant spec_names
+                i_end = i_start + len(spec_names_nested[i])
+                all_obs[:, loc] = np.median( spec[:, i_start:i_end], axis=1 ) # use median flux 
+                i_start = i_end
+
         
         # 3) Normalize flux: using total flux (small values), using mean flux (factor of len(y_names))
         if normalize_flux:
@@ -272,11 +308,18 @@ class DataLoader(cINNConfig):
             elif normalize_mean_flux:
                 all_obs[:, spec_locs] = all_obs[:, spec_locs]/np.mean(all_obs[:, spec_locs], axis=1).reshape(-1,1)
             elif normalize_f750:
-                wl = self.exp.get_muse_wl()[spec_indices]
-                f750_array = self.exp.get_dominika_f750_2d(wl, all_obs[:, spec_locs])
-                all_obs[:, spec_locs] = all_obs[:, spec_locs] / f750_array.reshape(-1,1)
-                
-                
+                if use_spec==False:
+                    if 'f7500' not in y_names:
+                        raise ValueError("Cannot normalize to f7500: f7500 is not in y_names when using flux values.")
+                    else:
+                        f750_locs = y_names.index('f7500')
+                        f750_array = all_obs[:, f750_locs]
+                        all_obs[:, spec_locs] = all_obs[:, spec_locs] / f750_array.reshape(-1,1)
+                else:
+                    wl = self.exp.get_wl(self)[spec_indices]
+                    f750_array = self.exp.get_dominika_f750_2d(wl, all_obs[:, spec_locs])
+                    all_obs[:, spec_locs] = all_obs[:, spec_locs] / f750_array.reshape(-1,1)
+                    
         # 2) Smoothing parameter 
         if smoothing:
             all_param = smooth_array(all_param, x_names, smoothing_sigma)
@@ -350,13 +393,20 @@ class DataLoader(cINNConfig):
                     self.mu_s = np.mean(all_lnsig, 0) + 0.5*(self.lsigb_min + self.lsigb_max)
                     self.w_s = np.diag( 1/np.sqrt(np.std(all_lnsig, 0)**2. + ((self.lsigb_max-self.lsigb_min)**2)/12  ))
             
-            elif self.unc_corrl == 'Ind_Man' or self.unc_corrl == 'Ind_Unif' or self.unc_corrl == 'Single':
+            elif self.unc_corrl == 'Ind_Unif' or self.unc_corrl == 'Single':
                 if self.unc_sampling == 'gaussian':
                     self.mu_s = np.zeros(len(self.y_names)) + self.lsig_mean
                     self.w_s = np.diag( 1/(np.zeros(len(self.y_names)) + self.lsig_std) )
                 elif self.unc_sampling == 'uniform':
                     self.mu_s = np.zeros(len(self.y_names)) + 0.5*(self.lsig_min + self.lsig_max)
-                    self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + abs(self.lsig_max-self.lsig_min)/np.sqrt(12) ) )
+                    self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + np.abs(self.lsig_max-self.lsig_min)/np.sqrt(12) ) )
+            elif self.unc_corrl == 'Ind_Man': # lsig_XX are read in list. 
+                if self.unc_sampling == 'gaussian':
+                    self.mu_s = np.zeros(len(self.y_names)) + np.array(self.lsig_mean)
+                    self.w_s = np.diag( 1/(np.zeros(len(self.y_names)) + np.array(self.lsig_std)) )
+                elif self.unc_sampling == 'uniform':
+                    self.mu_s = np.zeros(len(self.y_names)) + 0.5*(np.array(self.lsig_min) + np.array(self.lsig_max))
+                    self.w_s = np.diag( 1/( np.zeros(len(self.y_names)) + np.abs(np.array(self.lsig_max)-np.array(self.lsig_min))/np.sqrt(12) ) )
                     
             else:
                 # just generate random lsig
@@ -388,7 +438,7 @@ class DataLoader(cINNConfig):
             self.w_f = np.diag( 1/( np.zeros(len(self.flag_names)) + abs(1-0)/np.sqrt(12) ) )
 
         if self.wavelength_coupling:
-            wl = self.exp.get_muse_wl()[ self.exp.get_spec_index(self.y_names) ] # 아직 get_coupling_wavelength는 안써보기로
+            wl = self.exp.get_wl(self)[ self.exp.get_spec_index(self.y_names) ] # 아직 get_coupling_wavelength는 안써보기로
             data = np.random.choice(wl, len(wl)*1000)
             self.mu_wl = np.zeros(len(self.y_names)) + np.mean(data)
             self.w_wl =  np.diag( 1/( np.zeros(len(self.y_names)) + np.std(data) ) )
@@ -470,7 +520,10 @@ class DataLoader(cINNConfig):
             ymin = np.min(np.abs(all_y), axis=1) # minimum value for each 
             # unc_corrl, unc_sampling etc are considerd 
             if self.unc_corrl=='Seg_Flux':
-                flux = all_y[:, self.exp.get_spec_index(self.y_names, get_loc=True)]
+                spec_loc = self.exp.get_spec_index(self.y_names, get_loc=True)
+                if len(spec_loc)==0:
+                    spec_loc = self.exp.get_flux_loc(self.y_names)
+                flux = all_y[:, spec_loc]
             else: 
                 flux=None
             lsig = self.create_uncertainty(all_y.shape, flux=flux)  # now expand, n_sig_MC, c.n_noise_MC are deprecated
@@ -497,6 +550,8 @@ class DataLoader(cINNConfig):
         if self.cond_net_code=="hybrid_cnn":
             # Need to divide spec_data (for cnn) and global_data (for global_net)
             roi_spec = self.exp.get_spec_index(self.y_names, get_loc=True, use_bool=True)
+            if np.sum(roi_spec)==0:
+                roi_spec = self.exp.get_flux_loc(self.y_names, use_bool=True)
             if self.prenoise_training==True:
                 # divide y and sigma in axis=1
                 all_y_3d = all_y.reshape(-1, 2, len(self.y_names)) 
@@ -544,7 +599,7 @@ class DataLoader(cINNConfig):
             elif normalize_mean_flux:
                 rdata = rdata/np.mean(rdata, axis=1).reshape(-1,1)
             elif normalize_f750:
-                wl = self.exp.get_muse_wl()[np.array([int(i[1:]) for i in self.y_names])]
+                wl = self.exp.get_wl(self)[np.array([int(i[1:]) for i in self.y_names])]
                 f750_array = self.exp.get_dominika_f750_2d(wl, rdata)
                 rdata = rdata / f750_array.reshape(-1,1)
         
@@ -628,11 +683,12 @@ class DataLoader(cINNConfig):
         for att in ['lsig_min', 'lsig_max', 'lsig_mean', 'lsig_std']:
             kwarg[att] = getattr(self, att)
             
-        if 'Seg' in self.unc_corrl: 
+        if 'Seg' in self.unc_corrl:  # Seg_ option is only when using spectra. When using flux, use Ind_Unif
             # only for spectral y component
-            # spec_indices = self.exp.get_spec_index(self.y_names)
-            # wl = self.exp.get_muse_wl()[spec_indices]
-            kw_seg = {'seg_size':getattr(self, 'wl_seg_size'),  #'wl':wl, 
+            # for all Seg cases: neccessary parameters are wl, y_names
+            spec_indices = self.exp.get_spec_index(self.y_names)
+            wl = self.exp.get_wl(self)[spec_indices]
+            kw_seg = {'seg_size':getattr(self, 'wl_seg_size'),  'wl':wl, 
                       'y_names': getattr(self, 'y_names'),
                       'maxlgap':3 } # basic settup. you can update by sending kwarg
             kw_seg.update(kwarg)
@@ -640,10 +696,13 @@ class DataLoader(cINNConfig):
             if self.unc_corrl=='Seg_Flux':
                 if 'flux' not in kwarg.keys():
                     sys.exit("Flux is missing in random sigma sampling with Seg_Flux option")
-            
+
+            # flux 쓸때도 별도로 될 수 있도록 조치는 필요하긴 함.
             spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
+            if len(spec_locs)==0:
+                spec_locs = self.exp.get_flux_loc(self.y_names, use_bool=False)
             if len(spec_locs) < len(self.y_names): 
-                # non spectral y components exist
+                # non spectral/flux y components exist
                 # check if special sampling is set for this value
                 non_spec_locs = np.array([k for k in range(len(self.y_names)) if k not in spec_locs])
                 noise_pdf = {}
@@ -656,8 +715,8 @@ class DataLoader(cINNConfig):
                         noise_pdf[param]={'sampling': self.unc_sampling}
                         for att in ['lsig_min', 'lsig_max', 'lsig_mean', 'lsig_std']:
                             noise_pdf[param][att] = kwarg[att]
-                            
-                kwarg['noise_pdf']=noise_pdf
+                                
+                    kwarg['noise_pdf']=noise_pdf
             
        
         return self.exp.calculate_random_uncertainty(size, expand=expand, 
@@ -676,7 +735,7 @@ class DataLoader(cINNConfig):
         """
         Create wavelength corresponding to the flux
         """
-        wl = self.exp.get_muse_wl()[self.exp.get_spec_index(self.y_names)]
+        wl = self.exp.get_wl(self)[self.exp.get_spec_index(self.y_names)]
         return np.repeat(wl.reshape(1,-1), N_data, axis=0)
 
 
