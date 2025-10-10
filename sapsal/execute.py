@@ -294,8 +294,8 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
             try:
                 model.load(checkpoint_filename, device=c.device)
                 print("Loaded from checkpoint (%s)"%checkpoint_filename)
-            except: #Exception as e:
-                #print(e)
+            except Exception as e:
+                print(e)
                 resume = False
         else:
             resume=False
