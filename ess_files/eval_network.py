@@ -441,22 +441,28 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                             flux = obs_group[:, astro.exp.get_spec_index(c.y_names, get_loc=True)]
                         else:
                             flux = None
-                        lsig_group = astro.create_uncertainty(obs_group.shape, flux=flux) # created different lsig for all obs, 
+                        lsig_group = astro.create_uncertainty(obs_group.shape, flux=flux) # created different lsig for all obs, 2D array 
                     
                     else:
                         lsig_group = lsig_fix # fixed one value
-                else:
+                else: # use mean value of sigma range
                     # Currently not supported for Seg_Flux option
-                    if c.unc_sampling == 'gaussian':
-                        lsig_group = c.lsig_mean
-                    elif c.unc_sampling == 'uniform':
-                        lsig_group = 0.5*(c.lsig_min + c.lsig_max)
+                    if c.unc_corrl=='Ind_Man': # lsig_min, etc are list (same as len(y_names))
+                        if c.unc_sampling == 'gaussian':
+                            lsig_group = np.array(c.lsig_mean)
+                        elif c.unc_sampling == 'uniform':
+                            lsig_group = 0.5*(np.array(c.lsig_min) + np.array(c.lsig_max))
+                    else:
+                        if c.unc_sampling == 'gaussian':
+                            lsig_group = c.lsig_mean
+                        elif c.unc_sampling == 'uniform':
+                            lsig_group = 0.5*(c.lsig_min + c.lsig_max)
                 
                 # change dimension
                 if np.ndim(lsig_group)==0: # one value
                     # lsig_group = np.repeat(lsig_group, obs_group.shape[1]) # const -> 2D array
                     lsig_group = np.full(obs_group.shape, lsig_group)  # const -> 2D array
-                elif np.ndim(lsig_group)==1: # one spectra
+                elif np.ndim(lsig_group)==1: # one spectra (Ind_Man)
                     lsig_group = np.tile(lsig_group, (obs_group.shape[0], 1))
                 
                 # same error for all observations
