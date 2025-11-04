@@ -1495,7 +1495,7 @@ def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True, x_nam
 
 
 # calculate_map, if plot=True, give simple horizontal figure
-def calculate_map(parameter_distr, c, 
+def calculate_map(parameter_distr, c,   x_names=None,
                   bw_method = 'silverman', n_grid=1024, use_percentile = None,
                   exclude_unphysical=False, 
                   plot=False,  return_figure=False, plot_model = True, plot_map = True, plot_kde = True,
@@ -1510,6 +1510,16 @@ def calculate_map(parameter_distr, c,
     
     parameter_distr = parameter_distr.copy()
     npost = len(parameter_distr)
+
+    if x_names is not None:
+        # check dimension 
+        if parameter_distr.shape[1] != len(x_names):
+            raise ValueError("posterior and x_names dimension mismatch")
+        param_names = x_names
+    else:
+        param_names = c.x_names.copy()
+        
+    n_param = len(param_names)
     
     # check finite values (recommend to make default but to avoid redundant checking)
     if np.sum(np.isfinite(parameter_distr)==False)>0: # only there is any infinite value
@@ -1543,8 +1553,8 @@ def calculate_map(parameter_distr, c,
             
         # plot setting
         if not (nrow!=None and ncol!=None):
-            nrow = np.ceil(len(c.x_names)/4).astype(int)
-            ncol = np.ceil(len(c.x_names)/nrow).astype(int)
+            nrow = np.ceil(len(param_names)/4).astype(int)
+            ncol = np.ceil(len(param_names)/nrow).astype(int)
             figsize=[2.5*ncol, 3.5*nrow]
             
         fig, axis = plt.subplots(nrow, ncol, figsize=figsize)
@@ -1553,9 +1563,9 @@ def calculate_map(parameter_distr, c,
         
     plot_index = 0
 
-    map_list = np.zeros(len(c.x_names))
+    map_list = np.zeros(len(param_names))
     
-    for i_param, param in enumerate(c.x_names):
+    for i_param, param in enumerate(param_names):
 
         post = parameter_distr[:, i_param].copy() # 1D
         
