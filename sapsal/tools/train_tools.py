@@ -67,8 +67,9 @@ def check_divergence(loss_array, chunk_size=DIVG_CHUNK_SIZE, n_divg_check=N_DIVG
     # nan -> divergence
     if np.isfinite(loss_array[-1])==False:
         return True
-    # positivie value for neg_loglikelihood -> divergence
-    if negloglike==True and np.median(loss_array[-5:])>0:
+    
+    # positivie value for neg_loglikelihood -> divergence (check later)
+    if negloglike==True and np.median(loss_array[-5:])>0 and len(loss_array)>=2*n_divg_check:
         return True
     
     if np.sum(roi_divg[-n_check:]) == n_check:
