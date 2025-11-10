@@ -132,7 +132,7 @@ def randomize_config(c_ref, search_parameters, output_filename,
     # Update output directory and device
     c.device = device
     
-    # for hybrid_cnn mode
+    # for hybrid_cnn mode or hybrid_stack
     conv_net_config_params = ["out_dim_conv", "start_channels", "kernel_size_filter", "kernel_size_pooling"
                         "stride_filter", "stride_pooling"]
     global_net_config_params = ["out_dim_global", "n_layers_global"]

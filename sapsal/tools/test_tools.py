@@ -155,7 +155,7 @@ def calculate_z(model, astro, smoothing=True):
     # change to torch and device
     xT = torch.Tensor(x_test).to(astro.device)
     
-    if astro.cond_net_code=="hybrid_cnn":
+    if astro.cond_net_code=="hybrid_cnn" or astro.cond_net_code=="hybrid_stack":
         # Need to divide spec_data (for cnn) and global_data (for global_net)
         roi_spec = astro.exp.get_spec_index(astro.y_names, get_loc=True, use_bool=True)
         if np.sum(roi_spec)==0:

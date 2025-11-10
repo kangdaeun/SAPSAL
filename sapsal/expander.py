@@ -924,7 +924,7 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
             y_it = np.hstack((y_it, sig))
     
     
-    if astro.cond_net_code=="hybrid_cnn": # feature should be tuple
+    if astro.cond_net_code=="hybrid_cnn" or astro.cond_net_code=="hybrid_stack": # feature should be tuple
         # Need to divide spec_data (for cnn) and global_data (for global_net)
         roi_spec = get_spec_index(astro.y_names, get_loc=True, use_bool=True)
         if np.sum(roi_spec)==0:
@@ -2055,3 +2055,65 @@ def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_
     
     
     return L_acc_post
+
+
+############################################################################
+# Resimulation related functions
+############################################################################
+
+def resampspec(wlsamp, wl, fl, err=None):
+    """
+    Function to resample an input spectrum on a new wavelength grid
+    This is simple resampling using average of the bins. Not smoothing!
+    Becareful not to change resolution much
+    """
+    bin_edges_midpoints = (wlsamp[:-1] + wlsamp[1:]) / 2.0
+    
+    if len(wlsamp) > 1:
+        first_bin_start = wlsamp[0] - (wlsamp[1] - wlsamp[0]) / 2.0
+    else: 
+        first_bin_start = wlsamp[0] - 1.0 # 임의의 작은 값
+    
+    if len(wlsamp) > 1:
+        last_bin_end = wlsamp[-1] + (wlsamp[-1] - wlsamp[-2]) / 2.0
+    else:
+        last_bin_end = wlsamp[0] + 1.0 # 임의의 작은 값
+
+    bin_edges = np.concatenate(([first_bin_start], bin_edges_midpoints, [last_bin_end]))
+
+    bin_indices = np.digitize(wl, bin_edges) - 1 # -1을 하여 0부터 시작하는 인덱스로 조정
+
+    # 유효한 빈 인덱스 (0에서 len(wlsamp)-1 사이)만 필터링
+    valid_indices = (bin_indices >= 0) & (bin_indices < len(wlsamp))
+    
+    # 3. 각 빈에 속하는 플럭스 값들의 합과 개수 계산
+    # np.bincount는 정수 배열의 각 값의 출현 횟수를 세거나, 가중치를 적용하여 합을 계산합니다.
+    
+    # 플럭스 합계
+    # minlength는 bincount가 계산할 최소 인덱스 범위를 설정하여, 빈 값이 0인 경우에도 해당 빈이 포함되도록 합니다.
+    # len(wlsamp)가 최대 빈 인덱스가 되므로, len(wlsamp)를 지정합니다.
+    flux_sum = np.bincount(bin_indices[valid_indices], weights=fl[valid_indices], minlength=len(wlsamp))
+    
+    # 각 빈에 속하는 데이터 포인트의 개수
+    bin_counts = np.bincount(bin_indices[valid_indices], minlength=len(wlsamp))
+    
+    # 4. 평균 계산 (0으로 나누는 오류 방지)
+    rfl = np.zeros(len(wlsamp))
+    # bin_counts가 0보다 큰 빈에 대해서만 평균을 계산
+    non_zero_bins = bin_counts > 0
+    rfl[non_zero_bins] = flux_sum[non_zero_bins] / bin_counts[non_zero_bins]
+
+    # 4. If error data is provided, calculate the resampled error (rerr)
+    if err is not None:
+        # Calculate the sum of squared errors for each bin
+        err_sq_sum = np.bincount(bin_indices[valid_indices], weights=err[valid_indices]**2, minlength=len(wlsamp))
+        
+        # Initialize the resampled error array with zeros
+        rerr = np.zeros(len(wlsamp))
+        
+        # Calculate the new error using the error propagation formula
+        rerr[non_zero_bins] = np.sqrt(err_sq_sum[non_zero_bins]) / bin_counts[non_zero_bins]
+        
+        return rfl, rerr
+    
+    return rfl

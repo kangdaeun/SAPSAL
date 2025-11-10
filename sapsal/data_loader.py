@@ -547,7 +547,7 @@ class DataLoader(cINNConfig):
         pin_memory = torch.cuda.is_available()
         
         
-        if self.cond_net_code=="hybrid_cnn":
+        if self.cond_net_code=="hybrid_cnn" or self.cond_net_code=="hybrid_stack":
             # Need to divide spec_data (for cnn) and global_data (for global_net)
             roi_spec = self.exp.get_spec_index(self.y_names, get_loc=True, use_bool=True)
             if np.sum(roi_spec)==0:

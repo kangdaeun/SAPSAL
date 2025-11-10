@@ -286,9 +286,11 @@ class cINNConfig():
                     'cond_net_code': 'linear', # default is linear to maintain other networks
                                             # linear: use FeatureNet in model file. This is fully connected network. 
                                             #       Control with feature_width, feature_layer, y_dim_features in config
-                                            # hybrid_cnn: use HybridFeatureNetin feature_net.py. Combination of CNN and global_net (linear)
+                                            # hybrid_cnn: use HybridFeatureNet in feature_net.py. Combination of CNN and global_net (linear)
                                             #       Control with two config_dictionaries: conv_net_config, global_net_config
                                             # cnn: use ConvolutionalNetwork as a feature net. give  conv_net_config
+                                            # hybrid_stack: use HybridStackedFeatureNet in feature_net.py. Combination of CNN and linear global net, 
+                                            # but stack ouput of each convolutional layer. multiple use of global output. 
                     'conv_net_config': {"in_dim_conv": None, "out_dim_conv":256, #"n_layers":3, 
                                         "in_channels":1, "start_channels":16,
                                         "kernel_size_filter": 3, "kernel_size_pooling":2,
@@ -383,7 +385,7 @@ class cINNConfig():
             if self.wavelength_coupling==True:
                 self.y_dim_in += len(self.y_names)
                 
-        if self.cond_net_code=="hybrid_cnn":
+        if self.cond_net_code=="hybrid_cnn" or self.cond_net_code=="hybrid_stack":
             # give in_dim to conv_net and global_net -> count global params and spectral points
             self.conv_net_config['in_dim_conv'] = sum(1 for s in self.y_names if s.startswith('l') and s[1:].isdigit())
             self.global_net_config['in_dim_global'] = len(self.y_names) - self.conv_net_config['in_dim_conv']
@@ -392,7 +394,10 @@ class cINNConfig():
                 self.global_net_config['in_dim_global'] *= 2
             else: 
                 self.conv_net_config["in_channels"]=1
-                
+            
+            # hybrid_stack does not use out_dim_conv in conv_net_config
+            if self.cond_net_code=="hybrid_stack":
+                self.conv_net_config.pop("out_dim_conv", None) # remove this key
 
             
     def update_proj_dir(self, change_filename=True, change_tablename=True): #, change_expander=True): # expander deprecated
@@ -862,9 +867,9 @@ class cINNConfig():
         new_line(contents)
         
         # TEST
-        contents.append( "# Set cond_net_code:'linear' , 'hybrid_cnn'. if not set, default is linear" )
+        contents.append( "# Set cond_net_code:'linear' , 'hybrid_cnn', 'hybrid_stack'. if not set, default is linear" )
         contents.append(simple_sentence(self, 'cond_net_code'))
-        if  self.cond_net_code=="hybrid_cnn":
+        if  self.cond_net_code=="hybrid_cnn" or self.cond_net_code=="hybrid_stack":
             contents.append(simple_sentence(self, "conv_net_config"))
             contents.append(simple_sentence(self, "global_net_config"))
         new_line(contents)

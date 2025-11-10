@@ -109,10 +109,10 @@ SEARCH_PARAMETERS = {
     "feature_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 512
     "y_dim_features" : (tools.rand_in_log2, {"a":7, "b":9}),
     
-    "out_dim_conv" : (tools.rand_in_log2, {"a":8, "b":9}),  # only for hybrid_cnn mode. additional conditio n applied: out_dim_conv >= y_dim_features
-    "kernel_size_filter" : (tools.rand_in_discrete, {"options":[3, 5]}), # only for hybrid_cnn mode. kernel size (one value) for CNN
-    "out_dim_global" : (tools.rand_in_log2, {"a":2, "b":3}),  # only for hybrid_cnn mode. 
-    "n_layers_global": (np.random.randint, {"low":2, "high":3+1}), # only for hybrid_cnn mode. 
+    "out_dim_conv" : (tools.rand_in_log2, {"a":8, "b":9}),  # only for hybrid_cnn mode (not in hybrid_stack). additional conditio n applied: out_dim_conv >= y_dim_features
+    "kernel_size_filter" : (tools.rand_in_discrete, {"options":[3, 5]}), # only for hybrid_cnn/hybrid_stack mode. kernel size (one value) for CNN
+    "out_dim_global" : (tools.rand_in_log2, {"a":2, "b":3}),  # only for hybrid_cnn/hybrid_stack mode. 
+    "n_layers_global": (np.random.randint, {"low":2, "high":3+1}), # only for hybrid_cnn/hybrid_stack mode. 
     # "n_its_per_epoch" : (tools.rand_in_log2, {"a":8, "b":10}),
 #    # "fcl_internal_size" : (tools.rand_in_log2, {"a":7, "b":11}), 
 #    "scale_data" : (tools.rand_bool, {}),
@@ -162,7 +162,7 @@ def update_config_table(config, n):
     config_df_path = OUTPUT_DIR + "Config_table_%s.csv" % OUTPUT_SUFFIX
     
     # config_data = [['%d'%n, config.config_file]+[getattr(config, k) for k in SEARCH_PARAMETERS.keys()]]
-    # for hybrid_cnn
+    # for hybrid_cnn/hybrid_stack
     conv_net_config_params = ["out_dim_conv", "start_channels", "kernel_size_filter", "kernel_size_pooling"
                         "stride_filter", "stride_pooling"]
     global_net_config_params = ["out_dim_global", "n_layers_global"]

@@ -476,7 +476,7 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                                                   disable=(not c.progress_bar),
                                                   ncols=83):
     
-                if c.cond_net_code=="hybrid_cnn":
+                if c.cond_net_code=="hybrid_cnn" or c.cond_net_code=="hybrid_stack":
                     x, y1, y2 = data_tuple
                     x = x.to(c.device)
                     y = ( y1.to(c.device),  y2.to(c.device))
@@ -650,7 +650,7 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
                                                   disable=(not c.progress_bar),
                                                   ncols=83):
     
-                if c.cond_net_code=="hybrid_cnn":
+                if c.cond_net_code=="hybrid_cnn" or c.cond_net_code=="hybrid_stack":
                     x, y1, y2 = test_tuple
                     x = x.to(c.device)
                     y = ( y1.to(c.device),  y2.to(c.device))
@@ -3173,7 +3173,7 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
     # y_it have to be an 1D/2D torch tensor/list/np array (c.y_dim_in or (# of y) x c.y_dim)
     # if cond_net_code==hybrid_cnn. y_it should be tuple of (Tensor, Tensor)
     # input is ready for most cases. but change for 1 obs case.
-    if c.cond_net_code=="hybrid_cnn":
+    if c.cond_net_code=="hybrid_cnn" or c.cond_net_code=="hybrid_stack":
         conv_data, global_data = y_it 
         if global_data.ndim==1: 
             n_samp = 1
@@ -3204,9 +3204,9 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
     # for num, y in enumerate(y_it):
     for num in range(n_samp):
         with torch.no_grad():
-            if c.cond_net_code=="hybrid_cnn":
-                y_glob = (y_it[0][num])[None,:]
-                y_conv = (y_it[1][num])[None,:] 
+            if c.cond_net_code=="hybrid_cnn" or c.cond_net_code=="hybrid_stack":
+                y_glob = (y_it[1][num])[None,:]
+                y_conv = (y_it[0][num])[None,:] 
                 features = model.cond_net.features( (y_conv.to(c.device), y_glob.to(c.device)) ).view(1,-1).expand(N, -1)
             else:
                 y = y_it[num]
@@ -3249,7 +3249,7 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
     # y_it have to be an 1D/2D torch tensor/list/np array (c.y_dim_in or (# of y) x c.y_dim)
     # y_it = torch.Tensor(y_it).reshape(-1, c.y_dim_in) # Make 2D torch Tensor even if you gave only 1D tensor (1, c.y_dim_in)
     
-    if c.cond_net_code=="hybrid_cnn":
+    if c.cond_net_code=="hybrid_cnn" or c.cond_net_code=="hybrid_stack":
         conv_data, global_data = y_it 
         if global_data.ndim==1: 
             n_samp = 1
@@ -3287,7 +3287,7 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
     for i_group in range(n_group):
         
         with torch.no_grad():
-            if c.cond_net_code=="hybrid_cnn":
+            if c.cond_net_code=="hybrid_cnn" or c.cond_net_code=="hybrid_stack":
                 y_glob = global_data[group*i_group: group*(i_group+1)]
                 y_conv = conv_data[group*i_group: group*(i_group+1)]
                 ny = y_glob.shape[0]

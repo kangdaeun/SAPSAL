@@ -12,7 +12,7 @@ from torch.autograd import Variable
 #import FrEIA0p2.modules as Fm0p2
 from ..FrEIA import framework as Ff
 from ..FrEIA import modules as Fm
-from .feature_net import HybridFeatureNet #  ConvolutionalNetwork, GlobalParamNetwork,
+from .feature_net import HybridFeatureNet, HybridStackedFeatureNet #  ConvolutionalNetwork, GlobalParamNetwork,
 from typing import List, Tuple, Union
 
 
@@ -52,6 +52,8 @@ class ModelAdamGLOW(nn.Module):
         super().__init__()
         if c.cond_net_code=="hybrid_cnn":
             self.cond_net = HybridFeatureNet(c)
+        elif c.cond_net_code=="hybrid_stack":
+            self.cond_net = HybridStackedFeatureNet(c)
         else:
             self.cond_net = FeatureNet(c)
         self.cond_net.to(c.device)
