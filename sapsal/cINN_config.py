@@ -388,6 +388,8 @@ class cINNConfig():
         if self.cond_net_code=="hybrid_cnn" or self.cond_net_code=="hybrid_stack":
             # give in_dim to conv_net and global_net -> count global params and spectral points
             self.conv_net_config['in_dim_conv'] = sum(1 for s in self.y_names if s.startswith('l') and s[1:].isdigit())
+            if self.conv_net_config['in_dim_conv']==0: # flux-net
+                self.conv_net_config['in_dim_conv'] = sum(1 for s in self.y_names if s.startswith('f') and is_float(s[1:]))
             self.global_net_config['in_dim_global'] = len(self.y_names) - self.conv_net_config['in_dim_conv']
             if self.prenoise_training==True:
                 self.conv_net_config["in_channels"]=2
@@ -1098,3 +1100,11 @@ def read_config_from_file(config_file, **kwarg):
     config.read_config(config_file, **kwarg)
     
     return config
+
+
+def is_float(s):
+    try:
+        float(s)
+        return True
+    except ValueError:
+        return False

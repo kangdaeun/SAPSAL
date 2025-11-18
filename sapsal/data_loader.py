@@ -687,7 +687,10 @@ class DataLoader(cINNConfig):
             # only for spectral y component
             # for all Seg cases: neccessary parameters are wl, y_names
             spec_indices = self.exp.get_spec_index(self.y_names)
-            wl = self.exp.get_wl(self)[spec_indices]
+            if len(spec_indices)==0:
+                wl = np.array([float(self.y_names[k][1:]) for k in self.exp.get_flux_loc(self.y_names, use_bool=False)])
+            else:
+                wl = self.exp.get_wl(self)[spec_indices]
             kw_seg = {'seg_size':getattr(self, 'wl_seg_size'),  'wl':wl, 
                       'y_names': getattr(self, 'y_names'),
                       'maxlgap':3 } # basic settup. you can update by sending kwarg

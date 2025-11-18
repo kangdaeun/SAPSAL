@@ -433,8 +433,6 @@ class HybridStackedFeatureNet(nn.Module):
             n += 1 # Increment layer counter
             # print(n, self.ch_size_final)
             
-            
-            
             self.cnn_blocks.append( nn.Sequential(*layers) ) # each layer(block) will be used separately
             
         self.cnn_final_channel = in_chan # number of channels in the final CNN layer

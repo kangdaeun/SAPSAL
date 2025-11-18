@@ -100,7 +100,19 @@ def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_
             mini, maxi = random_parameters[param]
             f_min = f_min_dic.get(param, 0.) # 0 if f_min is not specified for this parameter
             f_max = f_max_dic.get(param, 0.)
-            params[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max)
+            # min/max for outside of boundary. for specific value. f_min/f_max is list or tuple (fraction, specific value)
+            if isinstance(f_min, (list, tuple)) and len(f_min) == 2:
+                f_min_value = f_min[1]
+                f_min = f_min[0]
+            else:
+                f_min_value = None
+            if isinstance(f_max, (list, tuple)) and len(f_max) == 2:
+                f_max_value = f_max[1]
+                f_max = f_max[0]
+            else:
+                f_max_value = None
+            params[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max, 
+                                                     f_min_value=f_min_value, f_max_value=f_max_value)
         elif param in table_cols:  # 2순위: 테이블에서 가져오기
             params[:, i] = table[param].values
         # else: 그대로 nan
@@ -111,7 +123,18 @@ def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_
             mini, maxi = random_parameters[param]
             f_min = f_min_dic.get(param, 0.)
             f_max = f_max_dic.get(param, 0.)
-            obs[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max)
+            if isinstance(f_min, (list, tuple)) and len(f_min) == 2:
+                f_min_value = f_min[1]
+                f_min = f_min[0]
+            else:
+                f_min_value = None
+            if isinstance(f_max, (list, tuple)) and len(f_max) == 2:
+                f_max_value = f_max[1]
+                f_max = f_max[0]
+            else:
+                f_max_value = None
+            obs[:, i] = generate_random_parameter(N, min_value=mini, max_value=maxi, f_min=f_min, f_max=f_max, 
+                                                  f_min_value=f_min_value, f_max_value=f_max_value)
         elif param in table_cols:
             obs[:, i] = table[param].values
         # else: 그대로 nan
@@ -210,7 +233,8 @@ def normalize_flux(obs_data, normalize_total_flux=None, normalize_mean_flux=None
         return obs_data
     
 def generate_random_parameter(N_data, min_value = None, max_value = None, 
-                              f_min = 0., f_max = 0.
+                              f_min = 0., f_max = 0.,
+                              f_min_value = None, f_max_value = None, # only for specific value 
                               ):
     """
     generate random values from a uniform distribution using given min_vaule and max_value U(min_value, max_value)
@@ -239,8 +263,14 @@ def generate_random_parameter(N_data, min_value = None, max_value = None,
         if f_max > 0: max_split = int(N_data * f_max)
         
         # min from start. max from end
-        values[:min_split] = min_value
-        values[N_data-max_split:] = max_value
+        if f_min_value is not None:
+            values[:min_split] = f_min_value
+        else:
+            values[:min_split] = min_value
+        if f_max_value is not None:
+            values[N_data-max_split:] = f_max_value
+        else:
+            values[N_data-max_split:] = max_value
 
     return values
 
@@ -1200,6 +1230,8 @@ def calculate_random_uncertainty(size, expand=1, correlation=None, sampling_meth
         # 1) sample lsig for spectral components
         # spec_indices = get_spec_index(y_names)
         spec_locs = get_spec_index(y_names, get_loc=True)
+        if len(spec_locs)==0:
+            spec_locs = get_flux_loc(y_names, use_bool=False)
         # wl = get_muse_wl()[spec_indices]
         
         iseg_list = divide_wl_segment(wl, **kwarg) # seg_size must be in kwarg, 
