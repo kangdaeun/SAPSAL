@@ -105,14 +105,21 @@ SEARCH_PARAMETERS = {
     "internal_layer": (np.random.randint, {"low":3, "high":6+1}),
     # # "batch_size" : (tools.rand_in_log2, {"a":8 ,"b":9}),
     "internal_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 256
+
+    "y_dim_features" : (tools.rand_in_log2, {"a":7, "b":9}),
+    # onlly for linear feature_net
     "feature_layer": (np.random.randint, {"low":3, "high":6+1}), # usually fixed to 3 (for Noise 3~9+1) (for Normal 3~5+1)
     "feature_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 512
-    "y_dim_features" : (tools.rand_in_log2, {"a":7, "b":9}),
-    
+
+    # hybrid cases
+    "cond_net_code": (tools.rand_in_discrete, {"options":["hybrid_cnn", "hybrid_stack"]}), # "hybrid_cnn" or "hybrid_stack", or "linear"
     "out_dim_conv" : (tools.rand_in_log2, {"a":8, "b":9}),  # only for hybrid_cnn mode (not in hybrid_stack). additional conditio n applied: out_dim_conv >= y_dim_features
     "kernel_size_filter" : (tools.rand_in_discrete, {"options":[3, 5]}), # only for hybrid_cnn/hybrid_stack mode. kernel size (one value) for CNN
+    # "kernel_size_filter" : (tools.rand_in_log2, {"a":2, "b":5}), # only for hybrid_cnn/hybrid_stack mode. kernel size (one value) for CNN
     "out_dim_global" : (tools.rand_in_log2, {"a":2, "b":3}),  # only for hybrid_cnn/hybrid_stack mode. 
     "n_layers_global": (np.random.randint, {"low":2, "high":3+1}), # only for hybrid_cnn/hybrid_stack mode. 
+    "pooling_type" : (tools.rand_in_discrete, {"options":["max", "avg"]}), # only for hybrid_cnn/hybrid_stack mode. pooling type for CNN: 'max' or 'avg'
+    "stack_final_layers" : (tools.rand_in_discrete, {"options":[None, "Auto4"]}), # only for hybrid_stack mode. None (layer=1) or "Auto4" (reduce dimension 1/4.)
     # "n_its_per_epoch" : (tools.rand_in_log2, {"a":8, "b":10}),
 #    # "fcl_internal_size" : (tools.rand_in_log2, {"a":7, "b":11}), 
 #    "scale_data" : (tools.rand_bool, {}),
@@ -164,7 +171,7 @@ def update_config_table(config, n):
     # config_data = [['%d'%n, config.config_file]+[getattr(config, k) for k in SEARCH_PARAMETERS.keys()]]
     # for hybrid_cnn/hybrid_stack
     conv_net_config_params = ["out_dim_conv", "start_channels", "kernel_size_filter", "kernel_size_pooling"
-                        "stride_filter", "stride_pooling"]
+                        "stride_filter", "stride_pooling", "pooling_type", "stack_final_layers"]
     global_net_config_params = ["out_dim_global", "n_layers_global"]
     config_data = ['%d'%n, config.config_file]
     for k in SEARCH_PARAMETERS.keys():

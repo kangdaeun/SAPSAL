@@ -121,6 +121,7 @@ class ConvolutionalNetwork(nn.Module):
             self.kernel_size_pooling = config_dict['kernel_size_pooling'] # one value
             self.stride_filter = config_dict['stride_filter'] # one value
             self.stride_pooling = config_dict['stride_pooling'] # one value
+            self.pooling_type = config_dict['pooling_type'] # 'max' or 'avg'
         except KeyError as e:
             raise ValueError(f"Missing required parameter in param_dict: {e}. Please check your config dictionary.")
 
@@ -169,10 +170,14 @@ class ConvolutionalNetwork(nn.Module):
             # ReLu (Activation Function)
             layers.append(nn.ReLU())
 
-            # Max pooling
-            layers.append(nn.MaxPool1d(kernel_size=self.kernel_size_pooling,
+            # Max pooling / Avg pooling 
+            if self.pooling_type == 'avg':
+                layers.append(nn.AvgPool1d(kernel_size=self.kernel_size_pooling,
                                        stride=self.stride_pooling))
-            
+            else: # default: max pooling
+                layers.append(nn.MaxPool1d(kernel_size=self.kernel_size_pooling,
+                                        stride=self.stride_pooling))
+                
             # Update channel trackers for the next layer
             in_chan = out_chan
             # out_chan = self.n_channels[n+1]
@@ -353,10 +358,14 @@ class HybridStackedFeatureNet(nn.Module):
             self.cnn_kernel_size_pooling = cnn_config_dict['kernel_size_pooling'] # one value
             self.cnn_stride_filter = cnn_config_dict['stride_filter'] # one value
             self.cnn_stride_pooling = cnn_config_dict['stride_pooling'] # one value
+            self.cnn_pooling_type = cnn_config_dict['pooling_type'] # 'max' or 'avg'
             
             self.gln_in_dim = gln_config_dict['in_dim_global'] # 
             self.gln_out_dim = gln_config_dict['out_dim_global'] # final dimension of gloab net
             self.gln_n_layers = gln_config_dict['n_layers_global'] # # of linear layers
+
+            self.stack_final_layers = cnn_config_dict.get('stack_final_layers', None) # None (layer=1) or "Auto4" (reduce dimension 1/4.)
+            # for old versions: None (layer=1)
         except KeyError as e:
             raise ValueError(f"Missing required parameter in param_dict: {e}. Please check your config dictionary.")
 
@@ -417,10 +426,13 @@ class HybridStackedFeatureNet(nn.Module):
             # ReLu (Activation Function)
             layers.append(nn.ReLU())
 
-            # Max pooling
-            layers.append(nn.MaxPool1d(kernel_size=self.cnn_kernel_size_pooling,
+            # Max pooling / Avg pooling 
+            if self.cnn_pooling_type == 'avg':
+                layers.append(nn.AvgPool1d(kernel_size=self.cnn_kernel_size_pooling,
                                        stride=self.cnn_stride_pooling))
-            
+            else: # default: max pooling
+                layers.append(nn.MaxPool1d(kernel_size=self.cnn_kernel_size_pooling,
+                                        stride=self.cnn_stride_pooling))
             
             # Add dimension to final network: flattend output + global net output
             self.final_in_dim += (temp_len_after_pooling * out_chan + self.gln_out_dim )
@@ -439,7 +451,22 @@ class HybridStackedFeatureNet(nn.Module):
         self.cnn_n_layers = n 
         
         # 3) Final linear network (1 layer): output dim: c.y_dim_features
-        self.final_layer = nn.Linear(self.final_in_dim, c.y_dim_features)
+        # Updates: using stack_final_layers in conv_net_config
+        if self.stack_final_layers == "Auto4":
+            n_layers=np.floor(0.5*np.log2(self.final_in_dim/c.y_dim_features)).astype(int) # total number of layers = n_layers + 1
+            final_layers = []
+            in_dim = self.final_in_dim
+            for i in range(n_layers):
+                out_dim = c.y_dim_features*(4**(n_layers-i))
+                final_layers.append(nn.Linear(in_dim, out_dim))
+                if out_dim != c.y_dim_features:
+                    final_layers.append(nn.ReLU())
+                in_dim = out_dim
+            if in_dim != c.y_dim_features:
+                final_layers.append(nn.Linear(in_dim, c.y_dim_features))
+            self.final_layer = nn.Sequential(*final_layers)
+        else:
+            self.final_layer = nn.Linear(self.final_in_dim, c.y_dim_features)
         
         
     # Input format is the same as HybridFeatureNet: tuple of spectral and glbal data

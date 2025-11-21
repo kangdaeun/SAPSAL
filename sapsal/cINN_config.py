@@ -295,6 +295,8 @@ class cINNConfig():
                                         "in_channels":1, "start_channels":16,
                                         "kernel_size_filter": 3, "kernel_size_pooling":2,
                                         "stride_filter":2, "stride_pooling":2,
+                                        "pooling_type":"max", # 'max' or 'avg'
+                                        "stack_final_layers": None, # Only used in hybrid_stack. None (layer=1) or "Auto4" (reduce dimension 1/4.)
                                         },
                     
                     'global_net_config':  {"in_dim_global": None, "out_dim_global":4, "n_layers_global":2,}, 
