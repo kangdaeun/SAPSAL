@@ -358,7 +358,8 @@ class HybridStackedFeatureNet(nn.Module):
             self.cnn_kernel_size_pooling = cnn_config_dict['kernel_size_pooling'] # one value
             self.cnn_stride_filter = cnn_config_dict['stride_filter'] # one value
             self.cnn_stride_pooling = cnn_config_dict['stride_pooling'] # one value
-            self.cnn_pooling_type = cnn_config_dict['pooling_type'] # 'max' or 'avg'
+            # self.cnn_pooling_type = cnn_config_dict['pooling_type'] # 'max' or 'avg'
+            self.cnn_pooling_type = cnn_config_dict.get('pooling_type', 'max')
             
             self.gln_in_dim = gln_config_dict['in_dim_global'] # 
             self.gln_out_dim = gln_config_dict['out_dim_global'] # final dimension of gloab net
