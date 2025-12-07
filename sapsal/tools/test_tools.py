@@ -34,7 +34,8 @@ testfile_suffix = {
     'z_test': '_z_test.csv',
     'TvP': '_TvP.pkl',
     'MAP': '_MAP.dat' ,
-    'u68': '_u68.dat'
+    'u68': '_u68.dat',
+    'err': '_err.dat'
     }
 
 testfigure_suffix = {
