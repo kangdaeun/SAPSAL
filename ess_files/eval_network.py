@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from astropy.io import ascii
 import os
 import sys
-import matplotlib.cm as cm
+# import matplotlib.cm as cm
 # from pathlib import Path
 from time import time
 import pickle
@@ -22,15 +22,12 @@ from argparse import ArgumentParser
 
 # from mpl_toolkits.axes_grid1 import make_axes_locatable
 # from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-import matplotlib.patheffects as PathEffects
-
+# import matplotlib.patheffects as PathEffects
 # import matplotlib.colors as clr
-
-
-import matplotlib.ticker as ticker
+# import matplotlib.ticker as ticker
 
 # import torch
-from astropy.table import Table, vstack
+from astropy.table import Table, vstack, hstack
 
 from sapsal.cINN_config import read_config_from_file
 from sapsal.data_loader import DataLoader
@@ -86,27 +83,45 @@ MAX_ATTEMPT = 5     # Maximum attempt of evaluation, if error occurs due to CUDA
 # if __name__=='__main__':
 #     config_file = sys.argv[1]
 
-def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
+def evaluate(c, astro=None, lsig_fix=None, only_veiled=False, map_method='maxll', verbose=VERBOSE):
     
     eval_TvP = True
     eval_calib = True
     eval_RMSE = True
     eval_z = True
     eval_u68 = True
+    eval_err = True
     
     run_forward = False
     run_all_post = False
     run_all_map = False
     run_all_u68 = False
+    run_all_err = False
     run_ind_post = False
     run_calib = False
     run_hist = False
     run_hist_map = False
     run_Ddist = False
+
+    if only_veiled==True:
+        asfx = '_veil'
+    else:
+        asfx = ''
     
     
     if c.domain_adaptation: eval_Ddist = True  
     else: eval_Ddist=False
+
+    # check map method
+    if map_method not in ['maxll', '1D']:
+        print("MAP method should be 'maxll' or '1D'. Use default 'maxll'")
+        map_method='maxll'
+
+    if verbose:
+        if map_method == 'maxll':
+            print("Use maxll MAP method: max probability point based on Jacobian and latent variables")
+        elif map_method == '1D':
+            print("Use 1D MAP method (KDE on 1D histogram)")
     
     # Setup file and figure names
     
@@ -132,9 +147,9 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     
     if eval_TvP:
         print("Request eval_TvP")
-        filename_dic['TvP'] = c.filename + tools.testfile_suffix['TvP'] # all
-        filename_dic['MAP'] = c.filename + tools.testfile_suffix['MAP'] # map -> all
-        filename_dic['RMSE'] = c.filename + tools.testfile_suffix['RMSE'] # all and map
+        filename_dic['TvP'] = c.filename + asfx + tools.testfile_suffix['TvP'] # all
+        filename_dic['MAP'] = c.filename + asfx + tools.testfile_suffix['MAP'] # map -> all
+        filename_dic['RMSE'] = c.filename + asfx + tools.testfile_suffix['RMSE'] # all and map
         
         # for Specific lsig for Noise-Net
         if c.prenoise_training==True and lsig_fix is not None:
@@ -169,8 +184,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             run_all_post = True
         
         # check figures
-        figurename_dic['TvP'] = c.filename + tools.testfigure_suffix['TvP']
-        figurename_dic['TvP_MAP'] = c.filename + tools.testfigure_suffix['TvP_MAP']
+        figurename_dic['TvP'] = c.filename + asfx + tools.testfigure_suffix['TvP']
+        figurename_dic['TvP_MAP'] = c.filename + asfx + tools.testfigure_suffix['TvP_MAP']
         
         # for Specific lsig for Noise-Net
         if c.prenoise_training==True and lsig_fix is not None:
@@ -188,8 +203,8 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     if eval_RMSE:
         print("Request eval_RMSE")
         
-        filename_dic['RMSE'] = c.filename + tools.testfile_suffix['RMSE'] # all and map
-        filename_dic['MAP'] = c.filename + tools.testfile_suffix['MAP'] # map -> all
+        filename_dic['RMSE'] = c.filename + asfx + tools.testfile_suffix['RMSE'] # all and map
+        filename_dic['MAP'] = c.filename + asfx + tools.testfile_suffix['MAP'] # map -> all
         
         # for Specific lsig for Noise-Net
         if c.prenoise_training==True and lsig_fix is not None:
@@ -212,12 +227,13 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             run_all_map = True
             run_all_post = True
             run_ind_post = True
+         
             
     if eval_calib:
         print("Request eval_calib")
         
-        filename_dic['calib'] = c.filename + tools.testfile_suffix['calib'] # all
-        figurename_dic['calib'] = c.filename + tools.testfigure_suffix['calib']
+        filename_dic['calib'] = c.filename + asfx + tools.testfile_suffix['calib'] # all
+        figurename_dic['calib'] = c.filename + asfx + tools.testfigure_suffix['calib']
         
         # for Specific lsig for Noise-Net
         if c.prenoise_training==True and lsig_fix is not None:
@@ -239,7 +255,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             
     if eval_u68:
         print("Request eval_u68")
-        filename_dic['u68'] = c.filename + tools.testfile_suffix['u68']
+        filename_dic['u68'] = c.filename + asfx + tools.testfile_suffix['u68']
         # for Specific lsig for Noise-Net
         if c.prenoise_training==True and lsig_fix is not None:
             # change filenames _{}
@@ -252,12 +268,45 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             run_all_post = True
             run_ind_post = True
             run_all_u68 = True
+
+    if eval_err:
+        print("Request eval_err")
+
+        filename_dic['err'] = c.filename + asfx + tools.testfile_suffix['err']
+        filename_dic['MAP'] = c.filename + asfx + tools.testfile_suffix['MAP'] # map -> all
+        # for Specific lsig for Noise-Net
+        if c.prenoise_training==True and lsig_fix is not None:
+            # change filenames _{}
+            filename_dic['err'] = filename_dic['err'][:-4] + adding + filename_dic['err'][-4:]
+            filename_dic['MAP'] = filename_dic['MAP'][:-4] + adding + filename_dic['MAP'][-4:]
+
+        if os.path.exists( filename_dic['MAP'] ):
+            print("\tRead MAP data")
+            _ = ascii.read(filename_dic['MAP'], format='commented_header', delimiter='\t')
+            map_list = np.array(_[c.x_names]).view(float).reshape(-1, len(c.x_names))
+            
+            if os.path.exists( filename_dic['err'] ):
+                print("\tErr and MAP files already exist. Do not need eval_RMSE.")
+                eval_err = False
+            else:
+                run_all_post = True
+                run_all_err = True
+                run_ind_post = True
+                if map_method=='1D':
+                    run_all_u68 = True       
+        else:
+            run_all_err = True
+            run_all_map = True
+            run_all_post = True
+            run_ind_post = True
+            if map_method=='1D':
+                run_all_u68 = True       
           
        
             
     if eval_Ddist: # only for domain adaptaion
         print("Request eval_Ddist")
-        figurename_dic['Ddist'] = c.filename + tools.testfigure_suffix['Ddist']
+        figurename_dic['Ddist'] = c.filename + asfx + tools.testfigure_suffix['Ddist']
         if os.path.exists(figurename_dic['Ddist']):
             run_Ddist = False
         else:
@@ -319,6 +368,20 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                                                  )
     param_test = test_set[0]; obs_test = test_set[1]   
     N_test = len(param_test)
+
+    if only_veiled==True:
+        print("Restrict evaluation to only veiled samples (i.e. r > 0.1)")
+        ## Restrict sample. sample with veil > 0.1
+        if 'veil_r' in c.x_names:
+            roi_target = param_test[:, c.x_names.index('veil_r')] > 0.1
+        elif 'log_veil_r' in c.x_names:
+            roi_target = param_test[:, c.x_names.index('log_veil_r')] > -1
+        else:
+            sys.exit("no veil in x_names")
+            
+        param_test = param_test[roi_target]
+        obs_test = obs_test[roi_target]
+        N_test = len(param_test)
     
     #%% 1) Latent tests
     if run_forward:
@@ -356,7 +419,6 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     # GROUP_SIZE: # n(obs) per one iteration
     n_group = np.ceil(len(param_test)/GROUP_SIZE).astype(int)
     
-    
     # eval_TvP:
     hist_range_dic = {}
     for i_param, param in enumerate(c.x_names):
@@ -387,11 +449,11 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
     # special parameters
     discretized_parameters = ['library']
     
-    # 2) map keywords
+    # 2) map keywords: only for 1D map (map_method='1D')
     map_kwarg = {'bw_method':'silverman', 
                  'n_grid':1024, 
                  'use_percentile': None,
-                 'plot':False }
+                 'plot':False } 
    
     
     # Calibration setting
@@ -419,6 +481,11 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         if run_all_u68:
             u68_list = [] # Nobs x Nparam 
             prc68_list = [] # Nobs x Nparam x 2 (low, high)
+
+        if run_all_err:
+            if map_method=='maxll':
+                maxi_list = []
+                mini_list = []
             
         if run_hist:
             hist_dic = {}
@@ -476,9 +543,9 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                 flag_group = None,
             
             # posterior per group
-            post_list = astro.exp.get_posterior(obs_group, c, N=N_PRED, use_group=True, group=GROUP_SIZE, 
+            post_list, llike_list = astro.exp.get_posterior(obs_group, c, N=N_PRED, use_group=True, group=GROUP_SIZE, 
                                                 unc=unc_group, flag=flag_group,
-                                          return_llike=False, quiet=True)
+                                                return_llike=True, quiet=True)
             
             
             # RMSE for all post
@@ -513,13 +580,24 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
                 for i_model, post in enumerate(post_list):
     
                     if run_all_map:
-                        map_list.append( astro.exp.calculate_map(post,c, **map_kwarg ) )
-                        
+                        if map_method=='maxll':
+                            map_values = post[np.argmax(llike_list[i_model]),:] 
+                        elif map_method=='1D':
+                            map_values = astro.exp.calculate_map(post,c, **map_kwarg ) 
+                        map_list.append(map_values)
+
                     if run_all_u68:
                         u, perc = astro.exp.calculate_uncertainty(post, c, confidence=68, percent=True, add_Teff=True, return_percentile=True)
                         # add_Teff only works when logTeff is in x_names
                         u68_list.append(u)
                         prc68_list.append(perc)
+
+                    if run_all_err:
+                        if map_method=='maxll':
+                            ind_llike_unc = np.where(llike_list[i_model] > np.max(llike_list[i_model]) - 2.0)[0]
+                            unc_post_area = post[ind_llike_unc,:]
+                            maxi_list.append( np.nanmax(unc_post_area, axis=0) )
+                            mini_list.append( np.nanmin(unc_post_area, axis=0) )
     
                     # calib with x-scaled
                     if run_calib:
@@ -575,6 +653,16 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         if run_all_u68:
             u68_list = np.array(u68_list)
             prc68_list = np.array(prc68_list)
+
+        if run_all_err:
+            if map_method=='maxll':
+                maxi_list = np.array(maxi_list)
+                mini_list = np.array(mini_list)
+                lerr_list = map_list - mini_list
+                uerr_list = maxi_list - map_list
+            elif map_method=='1D':
+                lerr_list = map_list - prc68_list[:,:,0]
+                uerr_list = prc68_list[:,:,1] - map_list
         
         # calib
         if run_calib:
@@ -611,12 +699,12 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         
         
     #%% eval remainings
+    # if map is newly calculated. save MAP information
+    if run_all_map:
+        ascii.write(Table(map_list, names=c.x_names), filename_dic['MAP'], format='commented_header', delimiter='\t', overwrite=True)
+        print("Saved MAP file")    
+
     if eval_RMSE:
-        
-        # save MAP information
-        if run_all_map:
-            ascii.write(Table(map_list, names=c.x_names), filename_dic['MAP'], format='commented_header', delimiter='\t', overwrite=True)
-        
         # if there is any preprocessing in MAP... preprocess true value as well (param_test)
         
         ptrue = param_test.copy()
@@ -654,13 +742,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
         ascii.write(rmse_table, filename_dic['RMSE'], format='commented_header', delimiter='\t', overwrite=True)
         print("Saved RMSE file")
         
-        # save MAP information
-        if run_all_map:
-            ascii.write(Table(map_list, names=c.x_names), filename_dic['MAP'], format='commented_header', delimiter='\t', overwrite=True)
-            print("Saved MAP file")    
-        
-    
-
+   
     if eval_TvP:
         
         """
@@ -686,7 +768,7 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             ascii.write(calib_table, filename_dic['calib'], delimiter='\t', format='commented_header')
             print("Saved calib data file")
             
-    if eval_u68:
+    if eval_u68: # or run_all_u68:
         if not os.path.exists(filename_dic['u68']):
             if u68_list.shape[1] > c.x_dim:
                 if 'logTeff' in c.x_names: 
@@ -703,6 +785,10 @@ def evaluate(c, astro=None, lsig_fix=None, verbose=VERBOSE):
             ascii.write(u68_table, filename_dic['u68'], format='commented_header', delimiter='\t', overwrite=True)
             print("Saved u68 file")
            
+    if eval_err:
+        err_table = hstack( [Table(lerr_list, names=[param+'_errL' for param in c.x_names]), Table(uerr_list, names=[param+'_errU' for param in c.x_names]) ] )
+        ascii.write(err_table, filename_dic['err'], format='commented_header', delimiter='\t', overwrite=True)
+        print("Saved err file")
             
             
      #%% TvP all plot      
@@ -744,22 +830,25 @@ if __name__=='__main__':
     parser.add_argument('-d','--device', required=False, default=None, help="device for network")
     parser.add_argument('-l','--lsig', required=False, default=None, help="Const log (sigma) or random for Noise-Net evaluation. If this is set, the filenames change.")
     parser.add_argument('-g', '--group_size', type=int, default=GROUP_SIZE, help="# of obs per one posterior processing (Default=400)")
+    parser.add_argument('-m', '--map_method', required=False, default='maxll', help="MAP calculation methods: 'maxll' or '1D' (default='maxll')")
     parser.add_argument('-L','--log', required=False, default=True, help="Save logfile T/F")
     parser.add_argument('-c', '--check', required=False, default=False, action='store_true', help="Check training status before running (T/F)")
-    
-    
+    parser.add_argument('-v', '--veil', required=False, default=False, action='store_true', help="Evalulate only for veiled models (r>0.1) (T/F)")
     
     args = parser.parse_args()
     
-    if args.log =='True' or  args.log=='1':
-        savelog=True
-    elif args.log is not True:
-        savelog = False
-    else:
-        savelog = True
+    if args.log =='True' or  args.log=='1': savelog=True
+    elif args.log is not True:  savelog = False
+    else: savelog = True
     
     GROUP_SIZE = args.group_size
     check_status = args.check
+
+    # if veil option is set, only use veiled models for evaluation (r > 0.1)
+    if args.veil:
+        eval_only_veild = True
+    else:
+        eval_only_veild = False
         
     # if savelog:
     #     logfile = os.path.basename(args.config_file).replace('.py','_evaluation.log').replace('c_','')
@@ -778,11 +867,10 @@ if __name__=='__main__':
         elif tools.check_training_status(c)==-1: # this check convergence and divergence of loss. -1 means diverged
             print("Network diverged. Pass evaluation (%s)"%os.path.basename(c.config_file))
             sys.exit()
-        
-        if tools.check_eval_status(c) == True: # already done basic evaluation
-            print("Alreay done evaluation (%s)"%os.path.basename(c.config_file) )
-            sys.exit()
-  
+        if eval_only_veild==False:
+            if tools.check_eval_status(c) == True: # already done basic evaluation
+                print("Alreay done evaluation (%s)"%os.path.basename(c.config_file) )
+                sys.exit()
         
     # for Noise-Net, if specific lsig is set
     if c.prenoise_training==True and args.lsig is not None:
@@ -794,7 +882,9 @@ if __name__=='__main__':
             print("Use specific lsig (%f) for this evaluation"%lsig_set)
     else:
         lsig_set = None
-        
+
+    
+
     # creat output directory and move log file
     if savelog:
         # sys.stdout.close()  
@@ -804,12 +894,16 @@ if __name__=='__main__':
         logpath = os.path.dirname(c.filename)+'/'
         if not os.path.exists(logpath):
             os.system('mkdir -p '+logpath)
+        
+        last_suffix = '_eval.log'
+        if eval_only_veild==True:
+            last_suffix = '_veil_eval.log'
             
         # new_logfile = logpath + logfile
         # os.system(f'mv {logfile} {new_logfile}')  # move log file
         # logfile = new_logfile
         
-        logfile = logpath.replace('/','.') + os.path.basename(c.filename)+'_eval.log'
+        logfile = logpath.replace('/','.') + os.path.basename(c.filename)+last_suffix
         if lsig_set is not None:
             if  lsig_set=="random":
                 logfile = logfile.replace('.log', '_lsig_{}.log'.format(lsig_set))
@@ -818,7 +912,20 @@ if __name__=='__main__':
         
         # sys.stdout = Logger(logfile, log_mode=LOG_MODE, mode="a") # continue logging
         logger = Logger(logfile, log_mode=LOG_MODE, mode="a")
+
+    # Check MAP method
+    map_method = 'maxll'
+    if args.map_method not in ['maxll', '1D']:
+        print("MAP method should be 'maxll' or '1D'. Use default 'maxll'")
         
+    elif args.map_method == '1D':
+        map_method = '1D'
+        print("Use 1D MAP method (KDE on 1D histogram)")
+    else:
+        print("Use maxll MAP method: max probability point based on Jacobian and latent variables")
+    
+
+
     astro = DataLoader(c)
     
     if args.device is not None:
@@ -869,7 +976,7 @@ if __name__=='__main__':
     for attempt in range(MAX_ATTEMPT):
         try:
             print(f"[Attempt {attempt+1}]: evaluation of {c.config_file}")
-            evaluate(c, astro=astro, lsig_fix=lsig_set)
+            evaluate(c, astro=astro, lsig_fix=lsig_set, map_method=map_method, only_veiled=eval_only_veild)
             break  # escape loop if succeed
         except RuntimeError as e:
             if "CUDA out of memory" in str(e) or "CUDA out of memory" in str(e.__cause__) or "CUDA error: out of memory" in str(e):
@@ -895,7 +1002,7 @@ if __name__=='__main__':
         # MAX_ATTEMPT 횟수 내에 성공하지 못했을 경우
         raise RuntimeError(f"Evaluation failed after {MAX_ATTEMPT} attempts due to repeated CUDA OOM.")
         
-    print("Finished evaluation: %s"%config_file)
+    
 
 
     # Check gpu memory used
@@ -913,6 +1020,7 @@ if __name__=='__main__':
         # print(torch.cuda.memory_summary(device=c.device, abbreviated=True))
         # print("-" * 50)
 
+    print("Finished evaluation: %s"%config_file)
     
     # move log file to path
     if savelog:
@@ -920,7 +1028,7 @@ if __name__=='__main__':
         # sys.stdout = sys.__stdout__ # stop logging
         logger.close()
         
-        new_logfile = logpath + os.path.basename(c.filename) +'_eval.log'
+        new_logfile = logpath + os.path.basename(c.filename) + last_suffix
         if lsig_set is not None:
             if  lsig_set=="random":
                 new_logfile = new_logfile.replace('.log', '_lsig_{}.log'.format(lsig_set))
