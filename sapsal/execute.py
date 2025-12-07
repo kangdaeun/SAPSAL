@@ -3214,17 +3214,19 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
         z = torch.randn(N, c.x_dim).to(c.device)
 
         with torch.no_grad():
-            x_samples, _ =  model.model(z, features, rev=True)
+            x_samples, ijac =  model.model(z, features, rev=True)
         
         outputs.append(x_samples.data.cpu().numpy())
         
         if return_llike:
-            with torch.no_grad():
-                _, jac =  model.model(x_samples, features, rev=False)
-            
+            # with torch.no_grad():
+            #     _, jac =  model.model(x_samples, features, rev=False)
+            # zz = torch.sum(z**2., dim=1)
+            # log_likelihood = -(0.5*zz) + jac
+
             zz = torch.sum(z**2., dim=1)
-            log_likelihood = -(0.5*zz) + jac
-            llikes.append( log_likelihood.to('cpu').detach().numpy() )
+            log_likelihood = -(0.5*zz) - ijac # ijac (jac from inverse) is -jac
+            llikes.append( log_likelihood.to('cpu').detach().numpy() -0.5 * c.x_dim * np.log(2 * np.pi) + np.log( np.linalg.det(c.w_x)) )
             
 
     # return a 3D ndarray (each array is N x c.x_dim) 
@@ -3300,7 +3302,7 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
             z = torch.randn(features.shape[0], c.x_dim).to(c.device)
             
             # with torch.no_grad():
-            x_samples, _ =  model.model(z, features, rev=True)
+            x_samples, ijac =  model.model(z, features, rev=True)
                 
             output = x_samples.data.cpu().numpy().reshape(ny, N, -1)
             if i_group==0:
@@ -3311,11 +3313,11 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
                 
             if return_llike:
                 # with torch.no_grad():
-                _, jac =  model.model(x_samples, features, rev=False)
+                # _, jac =  model.model(x_samples, features, rev=False)
                 
                 zz = torch.sum(z**2., dim=1)
-                log_likelihood = -(0.5*zz) + jac
-                llike =  log_likelihood.to('cpu').detach().numpy().reshape(ny, -1)
+                log_likelihood = -(0.5*zz) - ijac
+                llike =  log_likelihood.to('cpu').detach().numpy().reshape(ny, -1) -0.5 * c.x_dim * np.log(2 * np.pi) + np.log( np.linalg.det(c.w_x))
                 
                 if i_group==0:
                     llikes = llike
