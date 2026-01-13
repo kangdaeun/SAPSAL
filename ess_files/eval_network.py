@@ -370,7 +370,7 @@ def evaluate(c, astro=None, lsig_fix=None, only_veiled=False, map_method='maxll'
     N_test = len(param_test)
 
     if only_veiled==True:
-        print("Restrict evaluation to only veiled samples (i.e. r > 0.1)")
+        print("Restrict evaluation to only veiled samples (i.e. r > 0.1)\n")
         ## Restrict sample. sample with veil > 0.1
         if 'veil_r' in c.x_names:
             roi_target = param_test[:, c.x_names.index('veil_r')] > 0.1

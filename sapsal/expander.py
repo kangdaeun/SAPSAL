@@ -1783,6 +1783,13 @@ def plot_posterior(posterior, axis, c, x_names = None,
     for i_param, param in enumerate(param_names):
         
         post = posterior[:, i_param].copy() # 1D
+        # only use finite values
+        roi_finite = np.isfinite(post)
+        post = post[roi_finite]
+        if len(post)==0:
+            plot_hist=False
+        else:
+            plot_hist=True
         if x_true_given:
             true_val = x_true[i_param]
         if map_values_given:
@@ -1810,63 +1817,64 @@ def plot_posterior(posterior, axis, c, x_names = None,
         if xranges_dic is not None:
             if param in xranges_dic:
                 xrange = xranges_dic[param]
-
-        yhis, _xhis = np.histogram(post, bins=bins, density=True, range=xrange)
-        xhis = 0.5*(_xhis[:-1]+_xhis[1:])
-        if return_xranges_dic:
-            xranges_dic[param] = [min(_xhis), max(_xhis)]
+        if plot_hist:
+            yhis, _xhis = np.histogram(post, bins=bins, density=True, range=xrange)
+            xhis = 0.5*(_xhis[:-1]+_xhis[1:])
+            if return_xranges_dic:
+                xranges_dic[param] = [min(_xhis), max(_xhis)]
                        
         
         ax = axis[i_param]
-        if labels:
-            ax.bar(np.arange(len(yhis))+1, yhis , label='posterior', color=color_post)
-            if plot_true:
-                if np.isfinite(true_val):
-                    gt, _ = np.histogram(np.zeros(2)+true_val, bins=_xhis, density=True)
-                    gt = yhis * gt
-                    ax.bar(np.arange(len(gt))+1, gt, color='r', fill=False, linewidth=2.5, edgecolor='r')
-            ax.set_xticks(np.arange(len(yhis))+1)
-            ax.set_xticklabels(labels)
-  
-        else:
-            ax.step(xhis, yhis, where='mid', color=color_post)#,label='posterior')
-            ax.fill_between(xhis, yhis, color=color_post, alpha=alpha)#, label='posterior') 
-            
-            if xrange is not None:
-                xlim = ax.get_xlim()
-                
-            if plot_true:
-                if np.isfinite(true_val):
-                    ax.axvline(x=true_val, color='r', ls='-') # label="%s=%#.4g"%(legend_label_true, true_val))
-            if plot_map:
-                ax.axvline(x=x_map, color=color_map, ls='--')#  label="%s=%#.4g"%(legend_label_map, x_map))
-            
-            if xrange is not None:
-                ax.set_xlim(xlim)
+        if plot_hist:
+            if labels:
+                ax.bar(np.arange(len(yhis))+1, yhis , label='posterior', color=color_post)
+                if plot_true:
+                    if np.isfinite(true_val):
+                        gt, _ = np.histogram(np.zeros(2)+true_val, bins=_xhis, density=True)
+                        gt = yhis * gt
+                        ax.bar(np.arange(len(gt))+1, gt, color='r', fill=False, linewidth=2.5, edgecolor='r')
+                ax.set_xticks(np.arange(len(yhis))+1)
+                ax.set_xticklabels(labels)
     
-            txt = []
-            if text_true:
-                if np.isfinite(true_val):
-                    txt.append("%s=%#.4g"%(text_label_true, true_val))
-                    if param=='logTeff':
-                        txt.append('(%.5g [K])'%10**x_true[i_param])
-            if text_map:
-                txt.append( "%s=%#.4g"%(text_label_map, x_map))
+            else:
+                ax.step(xhis, yhis, where='mid', color=color_post)#,label='posterior')
+                ax.fill_between(xhis, yhis, color=color_post, alpha=alpha)#, label='posterior') 
+                
+                if xrange is not None:
+                    xlim = ax.get_xlim()
+                    
+                if plot_true:
+                    if np.isfinite(true_val):
+                        ax.axvline(x=true_val, color='r', ls='-') # label="%s=%#.4g"%(legend_label_true, true_val))
+                if plot_map:
+                    ax.axvline(x=x_map, color=color_map, ls='--')#  label="%s=%#.4g"%(legend_label_map, x_map))
+                
+                if xrange is not None:
+                    ax.set_xlim(xlim)
+    
+        txt = []
+        if text_true:
+            if np.isfinite(true_val):
+                txt.append("%s=%#.4g"%(text_label_true, true_val))
                 if param=='logTeff':
-                    txt.append('(%.5g [K])'%10**x_map)
-              
-            if text_u68:
-                txt.append('$u_{68}$=%#.4g'%(u68))
-                if param=='logTeff' and len(u68_values)==(n_param+1):
-                    txt.append('(%.5g [K])'%( u68_values[-1]))
-                    
-                    
-            if additional_text is not None:
-                txt.append(additional_text)
-        
-            if len(txt)>0:
-                ax.text(0.05,0.95, '\n'.join(txt), ha='left',  transform= ax.transAxes, va='top' , fontsize=txtsize,
-                            bbox=dict(boxstyle='round', facecolor='w', alpha=0.6, edgecolor='silver') )
+                    txt.append('(%.5g [K])'%10**x_true[i_param])
+        if text_map:
+            txt.append( "%s=%#.4g"%(text_label_map, x_map))
+            if param=='logTeff':
+                txt.append('(%.5g [K])'%10**x_map)
+            
+        if text_u68:
+            txt.append('$u_{68}$=%#.4g'%(u68))
+            if param=='logTeff' and len(u68_values)==(n_param+1):
+                txt.append('(%.5g [K])'%( u68_values[-1]))
+                
+                
+        if additional_text is not None:
+            txt.append(additional_text)
+    
+        if len(txt)>0:
+            ax.text(0.05,0.95, '\n'.join(txt), ha='left',  transform= ax.transAxes, va='top' , fontsize=txtsize,
+                        bbox=dict(boxstyle='round', facecolor='w', alpha=0.6, edgecolor='silver') )
             
       
             ax.xaxis.set_major_locator(ticker.MaxNLocator(3))
@@ -2087,6 +2095,552 @@ def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_
     
     
     return L_acc_post
+
+
+
+# ND MAP functions
+def calculate_map_and_uncertainty_ND(
+    data: np.ndarray, # N-Dimsional posterior distribution
+    confidence_level: float = 68.0, # Default for 1-sigma equivalent
+    verbose: bool = False,
+    kde_bw_method: str = 'silverman', # 'scott', 'silverman', or a float
+    initial_lm_method: str = 'L-BFGS-B', # Default to L-BFGS-B for speed, option 'Nelder-Mead' (slow)
+    initial_lm_options: dict = None,
+    run_global: bool = True, 
+    bh_niter: int = 50,
+    bh_T: float = 1.0,
+    bh_minimizer_method: str = 'L-BFGS-B',
+    bh_minimizer_options: dict = None,
+    plot_results: bool = False, # Controls if any plots are generated
+    plot_marginals: bool = True, # Plot 1D marginal PDFs if plot_results is True
+    show_plot: bool = True, # Call plt.show() if plot_results is True
+    x_names: list = None, # list of parameter names for this data. only used for marignals plot
+    ylabelsize='x-large', xlabelsize='x-large', legendsize=8, title_size='x-large', xticklabelsize='large', yticklabelsize='large',
+    
+): #-> tuple[np.ndarray, np.ndarray, np.ndarray, gaussian_kde]:
+    """
+    Calculates the Maximum A Posteriori (MAP) estimate and its uncertainty
+    (lower/upper errors corresponding to a confidence level) for a multi-dimensional
+    data distribution using Kernel Density Estimation (KDE).
+
+    Args:
+        data (np.ndarray): The 2D input data array (n_samples, n_dimensions).
+        confidence_level (float): The percentage of the central confidence interval
+                                  to calculate uncertainty for (e.g., 68.0 for 1-sigma equivalent).
+        verbose (bool): If True, print detailed logs during the process.
+        kde_bw_method (str or float): Bandwidth method for gaussian_kde.
+                                      'scott', 'silverman', or a float value.
+        initial_lm_method (str): Local minimization method for the *initial* MAP search.
+                                 (e.g., 'L-BFGS-B', 'Nelder-Mead'). Default is 'L-BFGS-B'.
+        initial_lm_options (dict): Options dictionary for the initial local minimizer.
+        bh_niter (int): Number of Basin Hopping iterations for global optimization.
+        bh_T (float): Temperature parameter for Basin Hopping.
+        bh_minimizer_method (str): Local minimization method for Basin Hopping.
+                                   (e.g., 'L-BFGS-B', 'Nelder-Mead').
+        bh_minimizer_options (dict): Options dictionary for the local minimizer.
+        plot_results (bool): If True, generate and display plots of the 1D marginal PDFs.
+        plot_marginals (bool): If True (and plot_results is True), plots individual 1D marginal PDFs for all dimensions.
+                                If False, no marginal plots are generated even if plot_results is True.
+        show_plot (bool): If True (and plot_results is True), calls plt.show() to display the plots.
+
+    Returns:
+        tuple[np.ndarray, np.ndarray, np.ndarray, gaussian_kde]:
+            - final_map_estimate (np.ndarray): 1D array of MAP values (1, n_dimensions).
+            - lower_errors (np.ndarray): 1D array of lower errors from MAP.
+            - upper_errors (np.ndarray): 1D array of upper errors from MAP.
+            - kde (gaussian_kde): The fitted gaussian_kde object.
+
+    Example keyword setting and usages:
+    nd_map_kwarg = {
+            'verbose': False, # already default is False
+            'kde_bw_method': 'silverman', # 'scott' or 'silverman', or 0.1 (a float), default silverman
+            'initial_lm_method':'L-BFGS-B', # for local minimization (default) option 'Nelder-Mead' (slow)
+            'initial_lm_options':{'disp': False}, # Suppress internal logs for initial local min
+            'run_global': True, # default True. 
+            'bh_niter':30, # default 50. Reduced iterations for faster example
+            'bh_T': 1.0, # default 1,
+            'bh_minimizer_method':'L-BFGS-B', # default 'L-BFGS-B'
+            'bh_minimizer_options':{'disp': False}, # Suppress L-BFGS-B internal logs
+            'plot_results': False, # default False
+            # 'x_names': c.x_names, # list of parameter names for this data. only used for marignals plot
+        }
+    map_values, lower_err, upper_err, fitted_kde = calculate_map_and_uncertainty_ND(post, **nd_map_kwarg)
+    """
+    from scipy.stats import gaussian_kde
+    from scipy.optimize import minimize, basinhopping
+    
+    if verbose: print("Starting multi-dimensional MAP estimation and uncertainty calculation...")
+
+    n_samples, n_dimensions = data.shape
+
+    # --- Data Scaling (Preprocessing) ---
+    if verbose: print("\nScaling data...")
+    data_mean_orig = np.mean(data, axis=0)
+    data_std_orig = np.std(data, axis=0)
+
+    # Prevent division by zero for dimensions with zero standard deviation
+    data_std_orig[data_std_orig == 0] = 1e-9
+
+    scaled_data = (data - data_mean_orig) / data_std_orig
+
+    # if verbose:
+    #     print(f"Scaled data shape: {scaled_data.shape}")
+    #     print(f"Scaling factors (mean): {data_mean_orig.round(4)}")
+    #     print(f"Scaling factors (standard deviation): {data_std_orig.round(4)}")
+
+    # --- Kernel Density Estimation (KDE) using SciPy's gaussian_kde ---
+    # gaussian_kde expects input data in (n_dimensions, n_samples) format.
+    if verbose: print(f"\nFitting KDE using SciPy gaussian_kde with bw_method='{kde_bw_method}'...")
+    kde = gaussian_kde(scaled_data.T, bw_method=kde_bw_method)
+    if verbose: print("KDE fitting complete.")
+
+    # --- Define the function to maximize (negative log posterior) ---
+    def neg_log_posterior_scaled(x_scaled):
+        # 'x_scaled' input should be reshaped to (n_dimensions, 1) for kde.evaluate()
+        density_scaled = kde.evaluate(x_scaled.reshape(-1, 1))[0]
+
+        # Handle cases where density might be zero or very close to zero
+        if density_scaled <= 1e-300:
+            return np.inf
+
+        # Transform density from scaled space back to original space
+        scaling_factor_product = np.prod(data_std_orig)
+        original_density = density_scaled / scaling_factor_product
+        return -np.log(original_density)
+
+    # --- Find the MAP Estimate using Optimization ---
+
+    # Initial guess for the optimizer (using median of original data)
+    initial_guess_orig = np.median(data, axis=0)
+    initial_guess_scaled = (initial_guess_orig - data_mean_orig) / data_std_orig
+
+    if verbose:
+        print(f"\nInitial guess for MAP (original scale, median): {initial_guess_orig.round(4)}")
+        print(f"Initial guess for MAP (scaled scale): {initial_guess_scaled.round(4)}")
+
+    # Optimization search space bounds (based on min/max of original data with margin)
+    margin_factor = 0.1 # Extend range by 10%
+    data_min_orig = np.min(data, axis=0)
+    data_max_orig = np.max(data, axis=0)
+
+    bounds_scaled = []
+    for i in range(n_dimensions):
+        range_i = data_max_orig[i] - data_min_orig[i]
+        min_val_orig_extended = data_min_orig[i] - range_i * margin_factor
+        max_val_orig_extended = data_max_orig[i] + range_i * margin_factor
+        
+        min_val_scaled = (min_val_orig_extended - data_mean_orig[i]) / data_std_orig[i]
+        max_val_scaled = (max_val_orig_extended - data_mean_orig[i]) / data_std_orig[i]
+        bounds_scaled.append((min_val_scaled, max_val_scaled))
+    bounds_scaled_tuple = tuple(bounds_scaled)
+
+    # if verbose: print(f"Optimization bounds (scaled scale, extended): {np.array(bounds_scaled_tuple).round(4)}")
+
+    # --- Local Optimization (Initial MAP search) ---
+    if verbose: print(f"\nPerforming initial local optimization to find a MAP candidate ({initial_lm_method})...")
+    
+    # Set default options for initial local minimizer if not provided
+    if initial_lm_options is None:
+        if initial_lm_method == 'L-BFGS-B':
+            initial_lm_options = {'disp': False} if not verbose else {'disp': True}
+        else: # For other methods, default to verbose control
+            initial_lm_options = {'disp': verbose}
+
+    local_result_scaled = minimize(neg_log_posterior_scaled, initial_guess_scaled,
+                                   method=initial_lm_method,
+                                   bounds=bounds_scaled_tuple,
+                                   options=initial_lm_options)
+
+    map_estimate_local_scaled = local_result_scaled.x
+    max_neg_log_density_local = local_result_scaled.fun
+    map_estimate_local_orig = map_estimate_local_scaled * data_std_orig + data_mean_orig
+    max_density_local = np.exp(-max_neg_log_density_local)
+
+    if verbose:
+        print(f"\nLocal MAP estimate (original scale): {map_estimate_local_orig.round(4)}")
+        print(f"Maximum density at local MAP: {max_density_local:.4e}")
+
+    if run_global:
+        # --- Global Optimization (e.g., Basin Hopping) ---
+        if verbose:
+            print(f"\nPerforming global optimization (Basin Hopping) for more robust MAP finding (niter={bh_niter}, T={bh_T})...")
+            print("This can take significantly longer, especially with more iterations. (Set run_global=False, if you want to skip global optimization)")
+        
+        try:
+            # Set default options for L-BFGS-B if not provided, to suppress excessive logging unless verbose
+            if bh_minimizer_options is None:
+                if bh_minimizer_method == 'L-BFGS-B':
+                    bh_minimizer_options = {'disp': False} if not verbose else {'disp': True}
+                else: # For other methods, default to verbose control
+                    bh_minimizer_options = {'disp': verbose}
+
+            basin_hopping_result_scaled = basinhopping(neg_log_posterior_scaled, initial_guess_scaled,
+                                                    niter=bh_niter,
+                                                    T=bh_T,
+                                                    minimizer_kwargs={"method": bh_minimizer_method, 
+                                                                        "bounds": bounds_scaled_tuple,
+                                                                        "options": bh_minimizer_options},
+                                                    disp=verbose)
+
+            map_estimate_global_scaled = basin_hopping_result_scaled.x
+            max_neg_log_density_global = basin_hopping_result_scaled.fun
+            map_estimate_global_orig = map_estimate_global_scaled * data_std_orig + data_mean_orig
+            max_density_global = np.exp(-max_neg_log_density_global)
+
+            if verbose:
+                print(f"\nGlobal MAP estimate (original scale): {map_estimate_global_orig.round(4)}")
+                print(f"Maximum density at global MAP: {max_density_global:.4e}")
+
+            # --- Choose the Best MAP Value ---
+            if max_density_global > max_density_local:
+                final_map_estimate = map_estimate_global_orig
+                final_max_density = max_density_global
+                if verbose: print("\nGlobal optimization yielded a higher density, choosing global MAP.")
+            else:
+                final_map_estimate = map_estimate_local_orig
+                final_max_density = max_density_local
+                if verbose: print("\nLocal optimization yielded a comparable or higher density, choosing local MAP.")
+        except Exception as e:
+            final_map_estimate = map_estimate_local_orig
+            if verbose: print(f"Global MAP searching fail (Error:{e})\nUse Local MAP")
+    else:
+        final_map_estimate = map_estimate_local_orig
+        if verbose: print("\nSkipped Global optimization: choosing local MAP.")
+
+    # if verbose:
+    #     print("\n-------------------------------------------")
+    #     print(f"Final MAP Value (1x{n_dimensions} array): {final_map_estimate.round(4)}")
+    #     print(f"Corresponding Maximum Density: {final_max_density:.4e}")
+    #     print("-------------------------------------------")
+
+    # --- Calculate Uncertainty (1-sigma equivalent) for Each Parameter ---
+    if verbose: print("\nCalculating uncertainty (1-sigma equivalent) for each parameter...")
+ 
+    lower_errors_array = np.zeros(n_dimensions)
+    upper_errors_array = np.zeros(n_dimensions)
+
+    # Calculate percentiles for confidence level
+    # e.g., for 68% CI, lower_percentile = 0.16, upper_percentile = 0.84
+    lower_percentile_val = (100.0 - confidence_level) / 200.0 
+    upper_percentile_val = (100.0 + confidence_level) / 200.0 
+
+    # Dictionary to store data for marginal plots if enabled
+    marginal_plot_data = {}
+
+    for dim_idx in range(n_dimensions):
+        if verbose: print(f"\nProcessing dimension {dim_idx}...")
+
+        dim_min_orig_i = data_min_orig[dim_idx]
+        dim_max_orig_i = data_max_orig[dim_idx]
+        
+        # Extend range for smoother marginal density estimation
+        range_i = dim_max_orig_i - dim_min_orig_i
+        eval_points_dim_orig = np.linspace(dim_min_orig_i - range_i * 0.2, dim_max_orig_i + range_i * 0.2, 500)
+        
+        # Create N-dimensional evaluation array for marginal density
+        # All other dimensions are fixed at their respective MAP values.
+        full_eval_points_scaled = np.zeros((n_dimensions, len(eval_points_dim_orig)))
+        
+        # Fill current dimension's values (scaled)
+        full_eval_points_scaled[dim_idx, :] = (eval_points_dim_orig - data_mean_orig[dim_idx]) / data_std_orig[dim_idx]
+
+        # Fill other dimensions' values (scaled MAP values)
+        for other_dim_idx in range(n_dimensions):
+            if other_dim_idx == dim_idx:
+                continue
+            full_eval_points_scaled[other_dim_idx, :] = (final_map_estimate[other_dim_idx] - data_mean_orig[other_dim_idx]) / data_std_orig[other_dim_idx]
+
+        # Evaluate KDE
+        marginal_density_scaled = kde.evaluate(full_eval_points_scaled)
+        
+        # Rescale density to original space
+        # Scaling factor for density transformation (Jacobian determinant)
+        scaling_factor_product = np.prod(data_std_orig)
+        marginal_density_orig = marginal_density_scaled / scaling_factor_product
+        
+        # Normalize the marginal density so its integral is 1
+        dx = eval_points_dim_orig[1] - eval_points_dim_orig[0]
+        integral = np.sum(marginal_density_orig) * dx
+        if integral > 0:
+            marginal_density_orig_normalized = marginal_density_orig / integral
+        else:
+            marginal_density_orig_normalized = marginal_density_orig # Handle case where integral is 0
+            if verbose: print(f"Warning: Integral of marginal density for dimension {dim_idx} is zero. Uncertainty calculation may be inaccurate.")
+
+        # Calculate Cumulative Distribution Function (CDF)
+        cdf = np.cumsum(marginal_density_orig_normalized) * dx
+
+        # Find percentiles
+        p_lower = eval_points_dim_orig[np.argmin(np.abs(cdf - lower_percentile_val))]
+        p_median = eval_points_dim_orig[np.argmin(np.abs(cdf - 0.50))] # Median
+        p_upper = eval_points_dim_orig[np.argmin(np.abs(cdf - upper_percentile_val))]
+
+        map_val = final_map_estimate[dim_idx]
+
+        # Calculate lower and upper errors from MAP
+        lower_error = map_val - p_lower
+        upper_error = p_upper - map_val
+        
+        lower_errors_array[dim_idx] = lower_error
+        upper_errors_array[dim_idx] = upper_error
+
+        # Store uncertainty information in internal dictionary for plotting
+        if plot_results and plot_marginals:
+            marginal_plot_data[f'dim_{dim_idx}'] = {
+                'MAP': map_val,
+                f'{lower_percentile_val*100:.0f}th_percentile': p_lower,
+                '50th_percentile_median': p_median,
+                f'{upper_percentile_val*100:.0f}th_percentile': p_upper,
+                'lower_error_from_MAP': lower_error,
+                'upper_error_from_MAP': upper_error,
+                'eval_points': eval_points_dim_orig,
+                'marginal_density_normalized': marginal_density_orig_normalized
+            }
+
+        # if verbose:
+        #     print(f"  Dimension {dim_idx} MAP: {map_val:.4f}")
+        #     print(f"  {lower_percentile_val*100:.0f}th Percentile: {p_lower:.4f}")
+        #     print(f"  {upper_percentile_val*100:.0f}th Percentile: {p_upper:.4f}")
+        #     print(f"  Lower Error (MAP - P{lower_percentile_val*100:.0f}): {lower_error:.4f}")
+        #     print(f"  Upper Error (P{upper_percentile_val*100:.0f} - MAP): {upper_error:.4f}")
+
+    # if verbose:
+    #     print("\n--- MAP and Uncertainty Summary ---")
+    #     for dim_idx in range(n_dimensions):
+    #         print(f"Dimension {dim_idx}: MAP = {final_map_estimate[dim_idx]:.4f}, Error = -{lower_errors_array[dim_idx]:.4f}/+{upper_errors_array[dim_idx]:.4f}")
+
+    if verbose:
+        print("\n--- Final MAP and Uncertainty Results ---")
+        for i in range(len(final_map_estimate)):
+            print(f"Dimension {i}: MAP = {final_map_estimate[i]:.4f}, Error = -{lower_errors_array[i]:.4f}/+{upper_errors_array[i]:.4f}")
+
+    # --- Plotting 1D Marginal Results (if plot_results and plot_marginals are True) ---
+    if plot_results and plot_marginals:
+        if verbose: print("\nGenerating 1D marginal PDF plots...")
+        num_plots = n_dimensions
+                
+        if num_plots == 0:
+            if verbose: print("No dimensions to plot marginals for.")
+        else:
+            use_name=False
+            if x_names is not None:
+                if len(x_names)==n_dimensions: use_name=True
+            
+            cols = min(4, num_plots) # Max 4 columns
+            rows = np.ceil(num_plots / cols).astype(int)
+            
+            fig_marginals, axes_marginals = plt.subplots(rows, cols, figsize=(4 * cols, 3.5 * rows))
+            axes_marginals = axes_marginals.flatten() # Flatten for easy iteration
+
+            for dim_idx in range(n_dimensions):
+                ax = axes_marginals[dim_idx]
+                dim_data = marginal_plot_data[f'dim_{dim_idx}']
+                
+                eval_points_dim_orig = dim_data['eval_points']
+                marginal_density_orig_normalized = dim_data['marginal_density_normalized']
+                map_val = dim_data['MAP']
+                p_lower = dim_data[f'{lower_percentile_val*100:.0f}th_percentile']
+                p_upper = dim_data[f'{upper_percentile_val*100:.0f}th_percentile']
+                # original_data_for_hist = data[:, dim_idx]
+
+                # Plot histogram of original data
+                # ax.hist(original_data_for_hist, bins='auto', density=True, alpha=0.6, color='gray', label='Data Histogram')
+                # Plot normalized marginal PDF
+                ax.plot(eval_points_dim_orig, marginal_density_orig_normalized, label='Marginal PDF')
+                ax.axvline(map_val, color='r', linestyle='--', label=f'MAP: {map_val:.4g}')
+                ax.axvline(p_lower, color='g', linestyle=':', label=f'{lower_percentile_val*100:.0f}th Pctl: {p_lower:.4g}')
+                ax.axvline(p_upper, color='g', linestyle=':', label=f'{upper_percentile_val*100:.0f}th Pctl: {p_upper:.4g}')
+                ax.fill_between(eval_points_dim_orig, 0, marginal_density_orig_normalized, 
+                                where=(eval_points_dim_orig >= p_lower) & (eval_points_dim_orig <= p_upper), 
+                                color='lightblue', alpha=0.5, label=f'Central {confidence_level:.0f}% CI')
+                
+                if use_name:
+                    ax.set_xlabel(exp.get_title(x_names[dim_idx], unit=True), size=xlabelsize)
+                    ax.set_title(f'{exp.get_title(x_names[dim_idx],unit=False)} Marginal PDF', size=title_size)
+                else:
+                    ax.set_xlabel(f'Dimension {dim_idx} Value', size=xlabelsize)
+                    ax.set_title(f'Dimension {dim_idx} Marginal PDF', size=title_size)
+                ax.set_ylabel('Probability Density', size=ylabelsize)
+                ax.legend(fontsize=legendsize)
+                ax.tick_params(axis='x', labelsize=xticklabelsize)
+                ax.tick_params(axis='y', labelsize=xticklabelsize)
+                # ax.grid(True)
+            
+            # Hide unused subplots
+            for i in range(num_plots, len(axes_marginals)):
+                fig_marginals.delaxes(axes_marginals[i])
+                
+            plt.tight_layout()
+            if show_plot: plt.show()
+    
+    return final_map_estimate, lower_errors_array, upper_errors_array, kde
+
+
+def plot_2d_kde_contour(
+    original_data: np.ndarray,
+    final_map_estimate: np.ndarray,
+    fitted_kde, #: gaussian_kde,
+    plot_dim_x: int,
+    plot_dim_y: int,
+    verbose: bool = False,
+    show_plot: bool = True,
+    figsize=(13, 5.5),
+    contour_levels = 50, # levels
+    x_names: list = None, # list of parameter names for this data. only used for marignals plot
+    ylabelsize='x-large', xlabelsize='x-large', legendsize='medium', title_size='x-large', xticklabelsize='large', yticklabelsize='large',
+    cmap=plt.get_cmap("viridis"), grid=False,
+):
+    """
+    Plots a 2D contour of the KDE density for two selected dimensions,
+    with original data points colored by their density.
+
+    Args:
+        original_data (np.ndarray): The original (unscaled) 2D input data array (n_samples, n_dimensions).
+        final_map_estimate (np.ndarray): The 1D array of MAP values (in original scale).
+        fitted_kde (gaussian_kde): The fitted gaussian_kde object (fitted on scaled data).
+        plot_dim_x (int): Index of the dimension to plot on the x-axis.
+        plot_dim_y (int): Index of the dimension to plot on the y-axis.
+        verbose (bool): If True, print detailed logs during the process.
+        show_plot (bool): If True, calls plt.show() to display the plots.
+        figsize (tuple or list): size of figure
+    """
+    import matplotlib.colors as clr
+
+    n_dimensions = original_data.shape[1]
+
+    if not (0 <= plot_dim_x < n_dimensions and 0 <= plot_dim_y < n_dimensions and plot_dim_x != plot_dim_y):
+        print(f"Error: Invalid contour_dims ({plot_dim_x}, {plot_dim_y}). Please provide two distinct and valid dimension indices (0 to {n_dimensions-1}).")
+        return
+
+    use_name=False
+    if x_names is not None:
+        if len(x_names)==n_dimensions: use_name=True
+
+    if verbose:
+        print(f"\nGenerating 2D projection plots (Dimensions {plot_dim_x} vs {plot_dim_y})...")
+    fig_contour, axes_contour = plt.subplots(1, 2, figsize=figsize)
+
+    # Re-calculate scaling factors from original data for consistent plotting
+    data_mean_orig = np.mean(original_data, axis=0)
+    data_std_orig = np.std(original_data, axis=0)
+    data_std_orig[data_std_orig == 0] = 1e-9 # Prevent division by zero
+
+    data_min_orig = np.min(original_data, axis=0)
+    data_max_orig = np.max(original_data, axis=0)
+
+    # --- Determine consistent axis limits ---
+    x_min_plot = data_min_orig[plot_dim_x]
+    x_max_plot = data_max_orig[plot_dim_x]
+    y_min_plot = data_min_orig[plot_dim_y]
+    y_max_plot = data_max_orig[plot_dim_y]
+
+    # --- Plot data points colored by density ---
+    scaled_original_data = (original_data - data_mean_orig) / data_std_orig
+    # Evaluate KDE for each original data point (on scaled data, then unscale density)
+    point_densities_scaled = fitted_kde.evaluate(scaled_original_data.T)
+    point_densities_orig_scale = point_densities_scaled / np.prod(data_std_orig)
+
+    # Calculate density at MAP
+    scaled_map = (final_map_estimate - data_mean_orig)/data_std_orig
+    densities_map_scaled = fitted_kde.evaluate(scaled_map.T)
+    densities_map = (densities_map_scaled / np.prod(data_std_orig))[0]
+
+    # --- Plot KDE contour ---
+    x_dim0_range = np.linspace(x_min_plot, x_max_plot, 100)
+    x_dim1_range = np.linspace(y_min_plot, y_max_plot, 100)
+    X, Y = np.meshgrid(x_dim0_range, x_dim1_range)
+
+    # Get values for other dimensions from the final_map_estimate
+    fixed_other_dims_values = np.array([final_map_estimate[d]
+                                        for d in range(n_dimensions)
+                                        if d != plot_dim_x and d != plot_dim_y])
+
+    eval_points_template = np.zeros((X.size, n_dimensions))
+    eval_points_template[:, plot_dim_x] = X.ravel()
+    eval_points_template[:, plot_dim_y] = Y.ravel()
+
+    current_other_dim_idx = 0
+    for d in range(n_dimensions):
+        if d != plot_dim_x and d != plot_dim_y:
+            eval_points_template[:, d] = fixed_other_dims_values[current_other_dim_idx]
+            current_other_dim_idx += 1
+
+    eval_points_2d_slice_scaled = (eval_points_template - data_mean_orig) / data_std_orig
+
+    Z_scaled = fitted_kde.evaluate(eval_points_2d_slice_scaled.T).reshape(X.shape)
+
+    scaling_factor_product_slice = np.prod(data_std_orig)
+    Z = Z_scaled / scaling_factor_product_slice
+
+    # --- Determine consistent colorbar limits ---
+    # Combine all density values to find global min/max for colorbar
+    all_densities = np.concatenate((point_densities_orig_scale.ravel(), Z.ravel()))
+    global_min_density = np.min(all_densities)
+    global_max_density = np.max(all_densities)
+    
+    # Create a normalized colormap for consistency
+    norm = clr.Normalize(vmin=global_min_density, vmax=global_max_density)
+
+    # Generate common ticks for the colorbar using MaxNLocator for "nice" ticks
+    # Aim for up to 5 ticks, but allow matplotlib to decide the exact number and spacing
+    locator = ticker.MaxNLocator(nbins=5) 
+    common_ticks = locator.tick_values(global_min_density, global_max_density)
+
+     # --- Panel 1: Scatter Plot ---
+    scatter = axes_contour[0].scatter(original_data[:, plot_dim_x], original_data[:, plot_dim_y], 
+                                      c=point_densities_orig_scale, cmap=cmap, s=10, alpha=0.8, norm=norm) 
+    cbar1 = fig_contour.colorbar(scatter, ax=axes_contour[0], ticks=common_ticks, label='Probability density')
+    # cbar1.set_ticks(common_ticks) # Set common ticks
+    axes_contour[0].scatter(final_map_estimate[plot_dim_x], final_map_estimate[plot_dim_y], 
+                            color='red', marker='X', s=200, label=f'MAP Estimate\n(Density:{densities_map:.4g})')
+    
+    # Set consistent axis limits
+    axes_contour[0].set_xlim(x_min_plot, x_max_plot)
+    axes_contour[0].set_ylim(y_min_plot, y_max_plot)
+
+    if use_name:
+        axes_contour[0].set_title(f'2D Projected Data Points ({exp.get_title(x_names[plot_dim_x], unit=False)} vs {exp.get_title(x_names[plot_dim_y], unit=False)})', size=title_size)
+        axes_contour[0].set_xlabel(f'{exp.get_title(x_names[plot_dim_x], unit=True)}', size=xlabelsize)
+        axes_contour[0].set_ylabel(f'{exp.get_title(x_names[plot_dim_y], unit=True)}', size=ylabelsize)
+    else:    
+        axes_contour[0].set_title(f'2D Projected Data Points (Dim {plot_dim_x} vs {plot_dim_y})', size=title_size)
+        axes_contour[0].set_xlabel(f'Dimension {plot_dim_x}', size=xlabelsize)
+        axes_contour[0].set_ylabel(f'Dimension {plot_dim_y}', size=ylabelsize)
+    axes_contour[0].legend(fontsize=legendsize)
+    axes_contour[0].grid(grid)
+    axes_contour[0].tick_params(axis='x', labelsize=xticklabelsize)
+    axes_contour[0].tick_params(axis='y', labelsize=xticklabelsize)
+
+    # --- Panel 2: KDE Contour Plot ---
+    # Generate contour levels that span the global density range
+    levels_for_contour = np.linspace(global_min_density, global_max_density, contour_levels)
+    contour = axes_contour[1].contourf(X, Y, Z, levels=levels_for_contour, cmap=cmap, norm=norm)
+    cbar2 = fig_contour.colorbar(contour, ax=axes_contour[1], ticks=common_ticks, label='Probability density')
+    # cbar2.set_ticks(common_ticks) # Set common ticks
+    axes_contour[1].scatter(final_map_estimate[plot_dim_x], final_map_estimate[plot_dim_y], 
+                            color='red', marker='X', s=200, label='MAP Estimate')
+    
+    # Set consistent axis limits
+    axes_contour[1].set_xlim(x_min_plot, x_max_plot)
+    axes_contour[1].set_ylim(y_min_plot, y_max_plot)
+
+    if use_name:
+        axes_contour[1].set_title(f'KDE Density Contour ({exp.get_title(x_names[plot_dim_x], unit=False)} vs {exp.get_title(x_names[plot_dim_y], unit=False)}, others fixed at MAP)', 
+                                  size=title_size)
+        axes_contour[1].set_xlabel(f'{exp.get_title(x_names[plot_dim_x], unit=True)}', size=xlabelsize)
+        axes_contour[1].set_ylabel(f'{exp.get_title(x_names[plot_dim_y], unit=True)}', size=ylabelsize)
+    else:  
+        axes_contour[1].set_title(f'KDE Density Contour (Dim {plot_dim_x} vs {plot_dim_y}, others fixed at MAP)', size=title_size)
+        axes_contour[1].set_xlabel(f'Dimension {plot_dim_x}', size=xlabelsize)
+        axes_contour[1].set_ylabel(f'Dimension {plot_dim_y}', size=ylabelsize)
+    
+    axes_contour[1].legend(fontsize=legendsize)
+    axes_contour[1].grid(grid)
+    axes_contour[1].tick_params(axis='x', labelsize=xticklabelsize)
+    axes_contour[1].tick_params(axis='y', labelsize=xticklabelsize)
+
+    plt.tight_layout()
+    if show_plot: plt.show()
 
 
 ############################################################################

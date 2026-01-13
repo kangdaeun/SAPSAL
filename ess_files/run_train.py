@@ -150,7 +150,6 @@ if __name__ == '__main__':
         else:
             train_network(c, data=astro, max_epoch=MAX_EPOCH, resume=resume)
     
-    print("Finished training: %s"%config_file)
 
     # Check gpu memory used
     if 'cuda' in c.device:
@@ -166,6 +165,8 @@ if __name__ == '__main__':
         # print("--- GPU Memory After Clearing Cache ---")
         # print(torch.cuda.memory_summary(device=c.device, abbreviated=True))
         # print("-" * 50)
+
+    print("Finished training: %s"%config_file)
         
     # move log file to path
     if savelog:
