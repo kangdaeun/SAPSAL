@@ -30,6 +30,7 @@ The following packages are required to run the scripts in this repository:
 | scipy | >= 1.11.4 |
 | astropy | >= 5.3.4 |
 | scikit-learn | >= 1.2.2 |
+| numba | >= 1.2.2 | Used in hydrogen slab codes (HSlabModel.py) |
 > ⚠️ Note: The versions listed are the ones tested with this repository.  
 > Earlier versions may also work, but compatibility is not guaranteed.
 
@@ -48,7 +49,7 @@ You can download pre-trained networks in networks/. Currently (2025. 06), there 
 | Stl_TGA_tpl | Teff, log g, Av (no veiling)  |  cINN trained only on BT-Settl, presented in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) <br>Trained on fixed Rv value of 4.4 |
 | SpD_TGARL_Noise_mMUSE  |  Teff, log g, Av, r_veil, library flag  | cINN presented in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) <br>Trained on BT-Settl and Dusty<br>Trained on fixed Rv value of 4.4|
 
-**SpD_TGARL_Noise_mMUSE** is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in prediction process (i.e. Noise-Net mode). THis network requires MUSE sectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) alomg the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
+**SpD_TGARL_Noise_mMUSE** is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in the prediction process (i.e., Noise-Net mode). This network requires MUSE spectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) along the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
 
 In each network directory, you will find a configuration file (c_XXXX.py) and a zipped network (XXXX.pt.zip). First, unzip the network to get the network file (XXXX.pt). Please keep the configuration file and network file in the same directory (this is not necessary, but it makes reading the network a bit easier).
 
