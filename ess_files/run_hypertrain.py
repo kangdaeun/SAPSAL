@@ -102,8 +102,8 @@ SEARCH_PARAMETERS = {
     "l2_weight_reg" : (tools.rand_in_log10, {"a":-4.3, "b":-2.0}), # (-4.3, -2.5)
     "meta_epoch" : (np.random.randint, {"low":5, "high":15+1}), # 5~15
     "n_blocks" : (np.random.randint, {"low":8, "high":16+1}), # noise-net: 24+1, normal-net:16+1
+    "batch_size" : (tools.rand_in_log2, {"a":8 ,"b":9}),
     "internal_layer": (np.random.randint, {"low":3, "high":6+1}),
-    # # "batch_size" : (tools.rand_in_log2, {"a":8 ,"b":9}),
     "internal_width" : (tools.rand_in_log2, {"a":8 ,"b":10}), # usually fixed to 256
 
     "y_dim_features" : (tools.rand_in_log2, {"a":7, "b":9}),
@@ -470,7 +470,6 @@ if __name__=='__main__':
     parser.add_argument('config_file', help="Run with specified config file as basis.")
     parser.add_argument('-s','--suffix', required=False, default=None, help="Output suffix")
     parser.add_argument('-o','--outputdir', required=False, default=None, help="Output directory")
-    # parser.add_argument('-r','--resume', required=False, default=None, help="Resume Hyperparameter search or not (T/F)")
     parser.add_argument('-r','--resume', required=False, default=False, action='store_true', help="Resume Hyperparameter search or not (T/F)")
     parser.add_argument('-n','--n_start', required=False, default=None, help="Start config from this numner (if resume=T)")
     

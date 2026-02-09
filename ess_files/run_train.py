@@ -86,6 +86,7 @@ if __name__ == '__main__':
     if os.environ.get("CUDA_LAUNCH_BLOCKING")==1: # This is only for debugging. do not use   
         print("CUDA_LAUNCH_BLOCKING =", os.environ.get("CUDA_LAUNCH_BLOCKING"))
         
+    print("Loading data...")
     data_loading_start=time()
     astro = DataLoader(c, update_rescale_parameters=True)
     print(f"[Time for data loading: {time() - data_loading_start:.2f}s]")
