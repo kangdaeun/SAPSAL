@@ -150,13 +150,19 @@ class ConvolutionalNetwork(nn.Module):
             # Or if temp_len_after_pooling becomes <= 0 (too small to continue meaningful convolution)
             if temp_size <= self.out_dim or temp_len_after_pooling <= 0:
                 # Ensure we have processed at least one layer to avoid empty network if in_dim is already small
-                if n > 0 or self.in_dim <= self.out_dim: # If no layers added yet, but current_len is already small enough
+                if n > 0:# or self.in_dim <= self.out_dim: # If no layers added yet, but current_len is already small enough
                     break # Stop adding layers
                     
             # Another condition: for too many layers
             if n > 7 and temp_size <= self.out_dim * 2:
                 break
-                
+            # Another condition (added 2026.01.23): avoid heavy computation. last flattend size <= 2**15
+            if temp_size > 2**15:
+                if n==0: # too heay after first layer -> need to reduce start_channels or change kernel/stride
+                    raise ValueError(f"1st Convolutional layer output too large ({temp_size}). "
+                                     f"Consider reducing start_channels or adjusting kernel/stride parameters.")
+                else: # no more layers
+                    break
             
             # --- Add current layer block if conditions are met ---
             # Convolution layer
@@ -408,11 +414,20 @@ class HybridStackedFeatureNet(nn.Module):
             # Stop if the next potential length is less than or equal to 2*(filter_kernel + filter_stride)
             if temp_size <= 2*(self.cnn_kernel_size_filter + self.cnn_stride_filter ):
                 # Ensure we have processed at least one layer to avoid empty network if in_dim is already small
-                if n > 0 or self.cnn_in_dim <= 2*(self.cnn_kernel_size_filter + self.cnn_stride_filter ): # If no layers added yet, but current_len is already small enough
+                if n > 0:# or self.cnn_in_dim <= 2*(self.cnn_kernel_size_filter + self.cnn_stride_filter ): # If no layers added yet, but current_len is already small enough
                     break # Stop adding layers
             # Another condition: for too many layers
             if n > 7:
                 break
+            # Another condition (added 2026.01.23): avoid heavy computation. last size <= 2**15
+            temp_final = self.final_in_dim + temp_len_after_pooling * out_chan + self.gln_out_dim
+            if temp_final > 2**15: # final_in_dim after this block
+                if n==0: # too heay after first layer -> need to reduce start_channels or change kernel/stride
+                    raise ValueError(f"Output after 1st convolution block too large ({temp_final}). "
+                                     f"Consider reducing start_channels or adjusting kernel/stride parameters.")
+                else: # no more layers
+                    break
+            
                 
             # --- Add current layer block if conditions are met ---
             layers = [] # set of conv layer 
