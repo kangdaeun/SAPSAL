@@ -30,7 +30,7 @@ The following packages are required to run the scripts in this repository:
 | scipy | >= 1.11.4 |
 | astropy | >= 5.3.4 |
 | scikit-learn | >= 1.2.2 |
-| numba | >= 1.2.2 | Used in hydrogen slab codes (HSlabModel.py) |
+| numba | >= 0.59.0 | Used in hydrogen slab codes (HSlabModel.py) |
 > ⚠️ Note: The versions listed are the ones tested with this repository.  
 > Earlier versions may also work, but compatibility is not guaranteed.
 
