@@ -86,11 +86,19 @@ If you use SAPSAL networks in your work, please cite the papers below.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the **MIT License**.
 
-It includes code from the FrEIA library (https://github.com/vislearn/FrEIA),  
-which is also licensed under the MIT License.
+### Third-party Code & Libraries
 
+* **FrEIA library** ([https://github.com/vislearn/FrEIA](https://github.com/vislearn/FrEIA)): 
+    * Licensed under the MIT License.
+    * Included in this repository as part of the core architecture.
+    * **Note:** This project includes a modified version based on FrEIA v0.2. It has been customized for this specific implementation and may differ from the latest upstream version. (See [Installation requirements](#installation-requirements) for details).
+ 
+* **FRAPPE** ([https://github.com/RikClaes/FRAPPE](https://github.com/RikClaes/FRAPPE)):
+    * This project incorporates code from the repository above for resimulation of some networks.
+    * **Note:** The original code did not have a specific license file at the time of integration (2026.02.09). We have included a slightly modified version (with 1-2 lines of minor modifications). 
+    * All rights to the original logic belong to the original author(s).
 
 <!--
 ## Features
@@ -102,6 +110,8 @@ which is also licensed under the MIT License.
 
 ## Folder Structure
 
+It includes code from the FrEIA library (https://github.com/vislearn/FrEIA),  
+which is also licensed under the MIT License.
 
 
 -->
