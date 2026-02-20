@@ -655,8 +655,27 @@ class cINNConfig():
             sys.exit(e)
         return db_exp
         
-    def copy(self):
-        return copy.deepcopy(self)
+    def copy(self, keep_network=False):
+        new_config = self.__class__.__new__(self.__class__)
+        
+        all_slots = set()
+        for cls in self.__class__.__mro__:
+            slots = getattr(cls, '__slots__', [])
+            if isinstance(slots, str):
+                all_slots.add(slots)
+            else:
+                all_slots.update(slots)
+        for key in all_slots:
+            if hasattr(self, key):
+                if key == 'network_model' and not keep_network:
+                    # 메모리 점유의 주범은 그냥 None 처리
+                    setattr(new_config, key, None)
+                else:
+                    value = getattr(self, key)
+                    setattr(new_config, key, copy.deepcopy(value))
+                    
+        return new_config
+        # return copy.deepcopy(self)
     
     #################################################################
     
