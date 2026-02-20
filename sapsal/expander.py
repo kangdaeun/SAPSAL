@@ -10,9 +10,14 @@ if sys.version_info >= (3, 9):
     import importlib.resources as resources
 else:
     import pkgutil
+    
+import multiprocessing as mp 
+import astropy.units as units
 # float_dtype = np.float64
 # int_dtype = np.int64
 # from astopy.table import Table
+
+
 
 def read_database(tablename):
     
@@ -786,7 +791,7 @@ def read_realdatabase(tablename, y_names, s_names=None): # read and only return 
  SpT related functions
 """
 # SpT - SpT index 
-def convert_spt_to_num(spt, out_nan=False):
+def convert_spt_to_num(spt, out_nan=True):
     if 'M' in spt:
         return float(spt[1:])+8 # K type: K0 ~ K7
     elif 'K' in spt:
@@ -808,7 +813,7 @@ def convert_spt_to_num(spt, out_nan=False):
         else:
             return None
                     
-def convert_sptnum_to_spt(spt, out_nan=False):
+def convert_sptnum_to_spt(spt, out_nan=True):
     if spt >=8:
         return 'M'+str(spt-8)
     elif spt <8 and spt >=0:
@@ -845,7 +850,7 @@ for key, name in spt_option_dic.items():
     early = tab['SpT'][np.argmax(tab[name])]
     spt_desc_dic[key] = "%s (%s - %s)"%(key, early, late)
 
-def convert_temp_to_sptnum(teff, option='Tpl', out_nan=False):
+def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
 
     if teff is None or teff == np.nan:
         return np.nan
@@ -883,7 +888,7 @@ def convert_temp_to_sptnum(teff, option='Tpl', out_nan=False):
     return num
 
 
-def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=False):
+def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
     if sptnum is None or sptnum == np.nan:
         return np.nan
 
@@ -919,9 +924,9 @@ def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=False):
     temp = (t2-t1)/(n2-n1)*(sptnum - n1) + t1
     return temp
 
-def convert_spt_to_temp(spt, option='Tpl', out_nan=False):
+def convert_spt_to_temp(spt, option='Tpl', out_nan=True):
     return convert_sptnum_to_temp( convert_spt_to_num(spt, out_nan=out_nan), option=option, out_nan=out_nan )
-def convert_temp_to_spt(temp, option='Tpl', out_nan=False):
+def convert_temp_to_spt(temp, option='Tpl', out_nan=True):
     return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan), out_nan=out_nan)
 
 # upgraded version
@@ -2046,58 +2051,6 @@ def scatter_color(fig, ax, xval, yval, cval, sval=40, plot_cbar=True,
 
 
 
-
-def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_norm,
-                             distance, distance_err, final_unit):
-    """
-    
-    Calculate log Lacc posterior for one observation. 
-    Use Monte Carlo for distance and flux
-    Give 1-sigma distance error and flux errors for each spectral bins
-    
-    Do not pass too long spectrum.
-    Parameters
-    ----------
-    wl : wavelength only for range needed to calculate F750 (AA)
-    y_obs : flux only for range needed to calculate F750 (physical unit)
-    y_err : flux error only for range needed to calculate F750 (physical unit)
-       
-    Av_values : 1D array of Av from posterior 
-    Rv_values : 1D array of Rv, if using just one Rv, give np.array([Rv])
-    r_values : 1D array of veil_r from posterior     
-    Fslab_norm : 1D array of veil_r from posterior (linear scale). normalized. no unit
-    distance : distance to target . for units, use final_unit 
-    distance_err : distance error (same unit as distance)
-    final_unit : final unit for Lacc (linear) : usuallyl kpc*kpc/Lsun in cgs
-        DESCRIPTION.
-
-    Returns
-    -------
-    result : Lacc_post (in linear scale)
-
-    """
-    
-             
-    # Setup Monte Carlo varaibles (not in posterior but have 1 sigma error)
-    N_mc = len(Av_values)
-    # distance, flux
-    dist_mc = np.random.normal(distance, distance_err, size=N_mc)
-    y_mc = np.random.normal(loc=y_obs, scale=y_err, size=(N_mc, len(y_obs)))
-
-    # deredden spectra 
-    y_drd = deredden_spectrum(wl, y_mc, Av_values, Rv_values)
-    f750 = get_f750(wl, y_drd) # f750 for MC/posterior cases (from dereddend)
-    F_acc_post = r_values / (1+r_values) * f750 * Fslab_norm #* units.erg / units.cm / units.cm / units.s # erg/cm2/s
-
-    # L_acc_post = ( 4*np.pi* (dist_mc*distance_unit)**2 * F_acc_post).to(units.erg/units.s) 
-    # L_acc_post = ( L_acc_post / cst.L_sun.to(units.erg/units.s)).value # in Lsun unit
-    L_acc_post = ( 4*np.pi* (dist_mc)**2 * F_acc_post) * final_unit
-    
-    
-    return L_acc_post
-
-
-
 # ND MAP functions
 def calculate_map_and_uncertainty_ND(
     data: np.ndarray, # N-Dimsional posterior distribution
@@ -2455,8 +2408,8 @@ def calculate_map_and_uncertainty_ND(
                                 color='lightblue', alpha=0.5, label=f'Central {confidence_level:.0f}% CI')
                 
                 if use_name:
-                    ax.set_xlabel(exp.get_title(x_names[dim_idx], unit=True), size=xlabelsize)
-                    ax.set_title(f'{exp.get_title(x_names[dim_idx],unit=False)} Marginal PDF', size=title_size)
+                    ax.set_xlabel(get_title(x_names[dim_idx], unit=True), size=xlabelsize)
+                    ax.set_title(f'{get_title(x_names[dim_idx],unit=False)} Marginal PDF', size=title_size)
                 else:
                     ax.set_xlabel(f'Dimension {dim_idx} Value', size=xlabelsize)
                     ax.set_title(f'Dimension {dim_idx} Marginal PDF', size=title_size)
@@ -2599,9 +2552,9 @@ def plot_2d_kde_contour(
     axes_contour[0].set_ylim(y_min_plot, y_max_plot)
 
     if use_name:
-        axes_contour[0].set_title(f'2D Projected Data Points ({exp.get_title(x_names[plot_dim_x], unit=False)} vs {exp.get_title(x_names[plot_dim_y], unit=False)})', size=title_size)
-        axes_contour[0].set_xlabel(f'{exp.get_title(x_names[plot_dim_x], unit=True)}', size=xlabelsize)
-        axes_contour[0].set_ylabel(f'{exp.get_title(x_names[plot_dim_y], unit=True)}', size=ylabelsize)
+        axes_contour[0].set_title(f'2D Projected Data Points ({get_title(x_names[plot_dim_x], unit=False)} vs {get_title(x_names[plot_dim_y], unit=False)})', size=title_size)
+        axes_contour[0].set_xlabel(f'{get_title(x_names[plot_dim_x], unit=True)}', size=xlabelsize)
+        axes_contour[0].set_ylabel(f'{get_title(x_names[plot_dim_y], unit=True)}', size=ylabelsize)
     else:    
         axes_contour[0].set_title(f'2D Projected Data Points (Dim {plot_dim_x} vs {plot_dim_y})', size=title_size)
         axes_contour[0].set_xlabel(f'Dimension {plot_dim_x}', size=xlabelsize)
@@ -2625,10 +2578,10 @@ def plot_2d_kde_contour(
     axes_contour[1].set_ylim(y_min_plot, y_max_plot)
 
     if use_name:
-        axes_contour[1].set_title(f'KDE Density Contour ({exp.get_title(x_names[plot_dim_x], unit=False)} vs {exp.get_title(x_names[plot_dim_y], unit=False)}, others fixed at MAP)', 
+        axes_contour[1].set_title(f'KDE Density Contour ({get_title(x_names[plot_dim_x], unit=False)} vs {get_title(x_names[plot_dim_y], unit=False)}, others fixed at MAP)', 
                                   size=title_size)
-        axes_contour[1].set_xlabel(f'{exp.get_title(x_names[plot_dim_x], unit=True)}', size=xlabelsize)
-        axes_contour[1].set_ylabel(f'{exp.get_title(x_names[plot_dim_y], unit=True)}', size=ylabelsize)
+        axes_contour[1].set_xlabel(f'{get_title(x_names[plot_dim_x], unit=True)}', size=xlabelsize)
+        axes_contour[1].set_ylabel(f'{get_title(x_names[plot_dim_y], unit=True)}', size=ylabelsize)
     else:  
         axes_contour[1].set_title(f'KDE Density Contour (Dim {plot_dim_x} vs {plot_dim_y}, others fixed at MAP)', size=title_size)
         axes_contour[1].set_xlabel(f'Dimension {plot_dim_x}', size=xlabelsize)
@@ -2644,8 +2597,266 @@ def plot_2d_kde_contour(
 
 
 ############################################################################
-# Resimulation related functions
+# Parameter propagation related functions: Lbol, Lacc
+# for MAP or posterior samples
 ############################################################################
+
+from . import HSlabModel
+
+def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_norm,
+                             distance, distance_err, final_unit):
+
+    """ 
+    Calculate Lacc posterior (linear) for one observation. 
+    Use Monte Carlo for distance and flux 
+    Give 1-sigma distance error and flux errors for each spectral bins (give None for no errors)
+    
+    Do not pass too long spectrum.
+    Parameters
+    ----------
+    wl : wavelength only for range needed to calculate F750 (AA)
+    y_obs : flux only for range needed to calculate F750 (physical unit)
+    y_err : flux error only for range needed to calculate F750 (physical unit)
+       
+    Av_values : 1D array of Av from posterior or a value (deredden function checks dimension)
+    Rv_values : 1D array of Rv from posterior or a value (deredden function checks dimension)
+    r_values : 1D array of veil_r from posterior     
+    Fslab_norm : 1D array of normalized integrated slab flux from posterior (linear scale)
+    distance : distance to target. unit should be applied to final unit
+    distance_err : distance error (same unit as distance)
+    final_unit : final unit for Lacc (linear) : usually it is kpc*kpc/Lsun in cgs. 
+        
+
+    Returns
+    -------
+    result : Lacc_post (in log scale)
+
+    """
+    
+    # Setup Monte Carlo varaibles (not in posterior but have 1 sigma error)
+    N_mc = len(Av_values)
+    # distance, flux
+    if distance_err is None or distance_err==0: # no distance error case
+        dist_mc = np.full(N_mc, distance)
+    else:
+        dist_mc = np.random.normal(distance, distance_err, size=N_mc)
+
+    if y_err is None or np.all(y_err==0):
+        y_mc = np.tile(y_obs, (N_mc,1))  # no flux error case
+    else:   
+        y_mc = np.random.normal(loc=y_obs, scale=y_err, size=(N_mc, len(y_obs)))
+
+    # deredden spectra 
+    y_drd = deredden_spectrum(wl, y_mc, Av_values, Rv_values)
+    f750 = get_f750(wl, y_drd) # f750 for MC/posterior cases (from dereddend)
+    F_acc_post = r_values / (1+r_values) * f750 * Fslab_norm #* units.erg / units.cm / units.cm / units.s # erg/cm2/s
+
+    # L_acc_post = ( 4*np.pi* (dist_mc*distance_unit)**2 * F_acc_post).to(units.erg/units.s) 
+    # L_acc_post = ( L_acc_post / cst.L_sun.to(units.erg/units.s)).value # in Lsun unit
+    L_acc_post = ( 4*np.pi* (dist_mc)**2 * F_acc_post) * final_unit
+    
+    return np.log10(L_acc_post)
+
+def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, bc7500=0,
+                        y_err=None, distance_err=None, final_unit=1, 
+                        use_Hslab_veiling=False, use_one_Hslab_model=False, Tslab_values=None, logne_values=None, logtau0_values=None,
+                        slab_kwargs={"wl_sp": 7500, "Zi":1, "wl_sp_unit":units.AA, "include_Hn":True, "Int_lam":True, "lam_unit":units.AA}
+                        ):
+    """ 
+    Calculate bolometric luminosity (Lbol) posterior (linear) for one observation. 
+    Use Monte Carlo for distance and flux 
+    Give 1-sigma distance error and flux errors for each spectral bins (give None for no errors)
+    
+    Do not pass too long spectrum. Only pass wl relevant to BC (f7500).
+    Parameters
+    ----------
+    wl : wavelength only for range needed to calculate F750 (AA)
+    y_obs : flux only for range needed to calculate F750 (physical unit)
+    y_err : flux error only for range needed to calculate F750 (physical unit) (or None)
+       
+    Av_values : 1D array of Av from posterior or a value (deredden function checks dimension)
+    Rv_values : 1D array of Rv from posterior or a value (deredden function checks dimension)
+    r_values : 1D array of veil_r from posterior     
+    # fslab_norm : 2D array of normalized slab spectra for each posterior, which will be used to remove veiling (N_post, wl) 
+    bc7500 : bolometric correction at 7500A : BC7500 is defined as log10( Fbol/F7500). Default = 0
+
+    distance : distance to target. unit should be applied to final unit
+    distance_err : distance error (same unit as distance) (or None)
+    final_unit : final unit for Lbol (linear) : usually it is kpc*kpc/Lsun in cgs. Default = 1
+
+    for slab models, set use_Hslab_veiling=True, use_one_Hslab_model=False, and give slab variables: Tslab_values, logne_values, logtau0_values with slab_kwarg
+
+    Returns
+    -------
+    result : Lbol_post (in log scale)
+
+    """
+    # Setup Monte Carlo varaibles (not in posterior but have 1 sigma error)
+    N_mc = len(Av_values)
+    # distance, flux
+    if distance_err is None or distance_err==0: # no distance error case
+        dist_mc = np.full(N_mc, distance)
+    else:
+        dist_mc = np.random.normal(distance, distance_err, size=N_mc)
+
+    if y_err is None or np.all(y_err==0):
+        y_mc = np.tile(y_obs, (N_mc,1))  # no flux error case
+    else:   
+        y_mc = np.random.normal(loc=y_obs, scale=y_err, size=(N_mc, len(y_obs)))
+
+    # deredden spectra 
+    y_drd = deredden_spectrum(wl, y_mc, Av_values, Rv_values)
+
+    # devil - depends on const. veil / Slab veil
+    if use_Hslab_veiling==True:
+        if use_one_Hslab_model==True: 
+            fslab_norm = read_example_slab()
+        else:
+            # check all params 
+            slab_variables = [Tslab_values, logne_values, logtau0_values]
+            if any(v is None for v in slab_variables):
+                raise ValueError("None value in slab variables (Tslab_values, logne_values, logtau0_values)")
+            target_size = len(r_values)
+            if any(len(v) != target_size for v in slab_variables):
+                raise ValueError(f"Slab variables and r_values have differenet size.")
+           
+            fslab = np.array( [HSlabModel.get_total_intensity(wl, t, 10**ne, 10**tau, **slab_kwargs) for t, ne, tau in zip(Tslab_values, logne_values, logtau0_values)] )
+            f750_array = get_f750(wl, fslab)
+            fslab_norm = fslab / f750_array.reshape(-1,1)
+    else:
+        fslab_norm=None
+
+    y_phot, veiling = remove_veil(wl, y_drd, r_values, fslab_norm = fslab_norm, return_veil=True)
+    f750 = get_f750(wl, y_phot) # f750 for MC/posterior cases (from dereddend)
+
+    # use bc
+    Fbol_post = 10**bc7500 * f750 # erg/s/cm2
+    # default bc7500 is 0 (not a real BC). If  not set, Fbol_post =
+        
+    Lbol750 = ( 4*np.pi* (dist_mc)**2 * Fbol_post) * final_unit
+    
+    return np.log10(Lbol750)
+
+def run_Lum_post(wl, y_obs,  Av_values, Rv_values, r_values, run_Lbol=False, run_Lacc=False,
+                        distance=1, bc7500=0, Fslab_norm=None,
+                        y_err=None, distance_err=None, final_unit=1, 
+                        use_Hslab_veiling=False, use_one_Hslab_model=False, Tslab_values=None, logne_values=None, logtau0_values=None,
+                        slab_kwargs={"wl_sp": 7500, "Zi":1, "wl_sp_unit":units.AA, "include_Hn":True, "Int_lam":True, "lam_unit":units.AA},
+                        **kwarg):
+    
+    # run Lbol
+    if run_Lbol:
+        Lbol_post = calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=distance, bc7500=bc7500, 
+                            y_err=y_err, distance_err=distance_err, final_unit=final_unit, 
+                            use_Hslab_veiling=use_Hslab_veiling, use_one_Hslab_model=use_one_Hslab_model, 
+                            Tslab_values=Tslab_values, logne_values=logne_values, logtau0_values=logtau0_values,
+                            slab_kwargs=slab_kwargs)
+    else:
+        Lbol_post = None
+    
+    # run Lacc
+    if run_Lacc==True and Fslab_norm is not None:
+        Lacc_post = calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_norm,
+                             distance, distance_err, final_unit)
+    else:
+        Lacc_post = None
+    
+    return {'Lbol_post':Lbol_post, 'Lacc_post':Lacc_post}
+    
+   
+
+
+# Slab modeling using multiprocessing
+# share slab keywords: wl_sp, Zi, unit, etc. Better to share wl, but controllable
+
+
+
+## For slab multiproessing
+_shared_slab_kwargs = {}
+# def _init_slab_worker(kwargs):
+#     global _shared_slab_kwargs
+#     _shared_slab_kwargs = kwargs
+
+def _init_slab_worker(kwargs):
+    global _shared_slab_kwargs
+    # 만약 kwargs가 튜플이나 리스트에 담겨왔다면 첫 번째 요소를 꺼냄
+    if isinstance(kwargs, (list, tuple)) and len(kwargs) > 0:
+        _shared_slab_kwargs = dict(kwargs[0])
+    else:
+        _shared_slab_kwargs = dict(kwargs)
+
+def _run_slab(task_row):
+    """실제 계산만 수행하는 핵심 함수"""
+    T, log_ne, log_tau0, wl = task_row
+    # 전역에 저장된 설정값을 사용하여 통신 비용 최소화
+    return HSlabModel.get_total_intensity(wl, T, 10**log_ne, 10**log_tau0, **_shared_slab_kwargs) 
+
+
+
+def run_multiple_slab_models(wl, Tslab_array, log_ne_array, log_tau0_array, normalize=False, 
+                slab_kwargs={"wl_sp": 7500, "Zi":1, "wl_sp_unit":units.AA, "include_Hn":True, "Int_lam":True, "lam_unit":units.AA},
+                use_multiprocessing=True, N_cpu=None, chunksize=None,
+                verbose=False):
+    
+    """
+    Run multiple slab models but wl is fixed for all. 
+
+    wl: 1D array to calculate slab flux. Follow the unit in slab_kwargs. Default is AA
+    Tslab_array: 1D array of slab temperatures. always give as array or list
+    log_ne_array: 1D array of log10 electron densities. always give as array or list
+    log_tau0_array: 1D array of log10 tau0 at wl_sp. always give as array or list
+    normalize: If True, normalize the output spectra at 7500A.
+    slab_kwargs: dictionary of keyword arguments to pass to HSlabModel.get_total_intensity
+    use_multiprocessing: If True, use multiprocessing to speed up calculations.
+    N_cpu: Number of CPU cores to use for multiprocessing. If None, use all available cores
+    
+    """
+    
+    n_models = len(Tslab_array)
+    if verbose:
+        print(f"Run {n_models} slab models with wl grid of {len(wl)} points.")
+    
+    if use_multiprocessing:
+        if verbose: print("\tRunning in multi-processing mode...")
+        
+        if N_cpu is None: N_cpu = mp.cpu_count()
+        else: N_cpu = np.min([N_cpu, mp.cpu_count()])
+
+        if chunksize is None:
+            # 수만 개일 때는 효율을 위해 100 이상, 작을 때는 1~20 사이로 자동 조절
+            chunksize = max(1, n_models // (N_cpu * 4))
+
+        # extract and prepare arguments for Hslab function
+        # tasks = [(t, ne, tau, wl) for t, ne, tau in zip(Tslab_array, log_ne_array, log_tau0_array)]
+        def task_generator():
+            for t, ne, tau in zip(Tslab_array, log_ne_array, log_tau0_array):
+                yield (t, ne, tau, wl)
+
+        with mp.Pool(processes=N_cpu, initializer=_init_slab_worker, initargs=(slab_kwargs,)) as pool:
+            # 수만 개 처리 시 효율을 위해 chunksize 적용
+            # chunk = max(1, len(tasks) // (N_cpu * 4))
+            # results = pool.map(_run_slab, tasks, chunksize=chunk)
+            results = pool.imap(_run_slab, task_generator(), chunksize=chunksize)
+            results = list(results) # needed to convert from iterator to list
+
+    else:
+        if verbose: print("\tRunning in single-processing mode...")
+        
+        results = [HSlabModel.get_total_intensity(wl, t, 10**ne, 10**tau, **slab_kwargs) for t, ne, tau in zip(Tslab_array, log_ne_array, log_tau0_array)] 
+       
+    results = np.array(results)
+    
+    if normalize:
+        # Normalization at 7500A
+        f750_array = get_f750(wl, results)
+        results = results / f750_array.reshape(-1,1)
+
+
+    return results
+
+
+
+
 
 def resampspec(wlsamp, wl, fl, err=None):
     """
