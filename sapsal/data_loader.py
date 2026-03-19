@@ -700,27 +700,27 @@ class DataLoader(cINNConfig):
                 if 'flux' not in kwarg.keys():
                     sys.exit("Flux is missing in random sigma sampling with Seg_Flux option")
 
-            # flux 쓸때도 별도로 될 수 있도록 조치는 필요하긴 함.
-            spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
-            if len(spec_locs)==0:
-                spec_locs = self.exp.get_flux_loc(self.y_names, use_bool=False)
-            if len(spec_locs) < len(self.y_names): 
-                # non spectral/flux y components exist
-                # check if special sampling is set for this value
-                non_spec_locs = np.array([k for k in range(len(self.y_names)) if k not in spec_locs])
-                noise_pdf = {}
-                for param in [self.y_names[loc] for loc in non_spec_locs]:
-                    if param+'_noise_pdf' in self.additional_kwarg.keys(): # 'R_V_noise_pdf
-                        noise_pdf[param] = self.additional_kwarg[param+'_noise_pdf']
-                        # this must contain 'sampling', and related 'lsig_min', 'lsig_max', etc
-                    else:
-                        # if not set, use the same pdf as spectral components
-                        noise_pdf[param]={'sampling': self.unc_sampling}
-                        for att in ['lsig_min', 'lsig_max', 'lsig_mean', 'lsig_std']:
-                            noise_pdf[param][att] = kwarg[att]
-                                
-                    kwarg['noise_pdf']=noise_pdf
-            
+        # flux 쓸때도 별도로 될 수 있도록 조치는 필요하긴 함.
+        spec_locs = self.exp.get_spec_index(self.y_names, get_loc=True)
+        if len(spec_locs)==0:
+            spec_locs = self.exp.get_flux_loc(self.y_names, use_bool=False)
+        if len(spec_locs) < len(self.y_names): 
+            # non spectral/flux y components exist
+            # check if special sampling is set for this value
+            non_spec_locs = np.array([k for k in range(len(self.y_names)) if k not in spec_locs])
+            noise_pdf = {}
+            for param in [self.y_names[loc] for loc in non_spec_locs]:
+                if param+'_noise_pdf' in self.additional_kwarg.keys(): # 'R_V_noise_pdf
+                    noise_pdf[param] = self.additional_kwarg[param+'_noise_pdf']
+                    # this must contain 'sampling', and related 'lsig_min', 'lsig_max', etc
+                else:
+                    # if not set, use the same pdf as spectral components
+                    noise_pdf[param]={'sampling': self.unc_sampling}
+                    for att in ['lsig_min', 'lsig_max', 'lsig_mean', 'lsig_std']:
+                        noise_pdf[param][att] = kwarg[att]
+                            
+                kwarg['noise_pdf']=noise_pdf
+        
        
         return self.exp.calculate_random_uncertainty(size, expand=expand, 
                                                      correlation=self.unc_corrl, sampling_method=self.unc_sampling,
