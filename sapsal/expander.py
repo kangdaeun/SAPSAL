@@ -791,7 +791,7 @@ def read_realdatabase(tablename, y_names, s_names=None): # read and only return 
  SpT related functions
 """
 # SpT - SpT index 
-def convert_spt_to_num(spt, out_nan=True):
+def convert_spt_to_num(spt, out_nan=True, verbose=True):
     if 'M' in spt:
         return float(spt[1:])+8 # K type: K0 ~ K7
     elif 'K' in spt:
@@ -807,13 +807,14 @@ def convert_spt_to_num(spt, out_nan=True):
     elif 'O' in spt:
         return float(spt[1:])-50
     else:
-        print("No matching")
+        if verbose:
+            print("No matching")
         if out_nan:
             return np.nan
         else:
             return None
                     
-def convert_sptnum_to_spt(spt, out_nan=True):
+def convert_sptnum_to_spt(spt, out_nan=True, verbose=True):
     if spt >=8:
         return 'M'+str(spt-8)
     elif spt <8 and spt >=0:
@@ -829,7 +830,8 @@ def convert_sptnum_to_spt(spt, out_nan=True):
     elif spt < -40 and spt >= -50:
         return 'O'+str(spt+50)
     else:
-        print("No matching")
+        if verbose:
+            print("No matching")
         if out_nan:
             return np.nan
         else:
@@ -841,7 +843,7 @@ cvt_file = module_path +'/' + 'SpT-Teff_combine.txt'
 spt_convert_table = ascii.read(cvt_file , format='commented_header', delimiter='\t')
 spt_option_dic = {'KH95': 'Teff_KH95', 'L03': 'Teff_L03', 'HH14': 'Teff_HH14', 
               'Tr14_ori': 'Teff_Tr14_It24', 'Tpl_ori': 'Teff_Templates', 
-              'Tr14': 'Tr14_ext', 'Tpl': 'Tpl_ext'}
+              'Tr14': 'Tr14_ext', 'Tpl': 'Tpl_ext', 'PMHH':'PMHH'}
 spt_desc_dic = {}
 for key, name in spt_option_dic.items():
     teff = spt_convert_table[name]
@@ -924,10 +926,10 @@ def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
     temp = (t2-t1)/(n2-n1)*(sptnum - n1) + t1
     return temp
 
-def convert_spt_to_temp(spt, option='Tpl', out_nan=True):
-    return convert_sptnum_to_temp( convert_spt_to_num(spt, out_nan=out_nan), option=option, out_nan=out_nan )
-def convert_temp_to_spt(temp, option='Tpl', out_nan=True):
-    return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan), out_nan=out_nan)
+def convert_spt_to_temp(spt, option='Tpl', out_nan=True, verbose=True):
+    return convert_sptnum_to_temp( convert_spt_to_num(spt, out_nan=out_nan, verbose=verbose), option=option, out_nan=out_nan )
+def convert_temp_to_spt(temp, option='Tpl', out_nan=True, verbose=True):
+    return convert_sptnum_to_spt( convert_temp_to_sptnum(temp, option=option, out_nan=out_nan), out_nan=out_nan, verbose=verbose)
 
 # upgraded version
 def make_spt(only_int=False, option='Tr14'):
@@ -1387,7 +1389,7 @@ title_unit_dic = {
     
     
     # slab parameters
-    'Tslab': r"T$_{\mathrm{slab}}$",
+    'Tslab': r"T$_{\mathrm{slab}}$ (K)",
     'log_ne': r"log n$_{\mathrm{e,slab}}$ (cm$^{-3}$)",
     'ne': r"n$_{\mathrm{e,slab}}$ (cm$^{-3}$)",
     
@@ -1529,6 +1531,72 @@ def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True, x_nam
         
     else:
         return unc_list
+
+from scipy.spatial.distance import mahalanobis
+from scipy.stats import chi2
+def get_threshold(confidence, dof):
+    return chi2.ppf(confidence, dof)
+
+# New MAP calculation based on max log-likelihood. option to change
+def find_map_zone(posterior, llike, robust_map=True, robust_unc=True, #config=None, 
+                    confidence_map=0.95, # robust_map mode 
+                    confidence_unc=0.95, # robust_err mode 
+                    verbose=False):
+    """
+    posterior: 2D array of shape (n_samples, n_parameters)
+    llike: 1D array of shape (n_samples, ), log-likelihood values corresponding to posterior samples
+    robust_map: bool, whether to check if the MAP point is an outlier in the uncertainty region and find alternative MAP if it is. Default is True.
+    robust_unc: bool, whether to use mahalanobis distance to exclude outliers in the uncertainty region. Default is True.
+    confidence_map: float, confidence level for checking if MAP point is an outlier. Default is 0.95 (95% confidence).
+    confidence_unc: float, confidence level for checking if uncertainty point is an outlier. Default is 0.95 (95% confidence).
+
+    return arg_map (one value), roi_unc (boolean array)
+    
+    """
+    
+    arg_map = np.argmax(llike)
+    map_val = posterior[arg_map]
+    x_dim = posterior.shape[1]
+
+    if robust_map:
+        ind_unc = llike > np.max(llike) - 2.0
+        post_unc = posterior[ind_unc]
+
+        # Check Mahalobis distance of the MAP point to the average point in the uncertainty region
+        avg_val = np.nanmean(post_unc, axis=0)
+        inv_cov = np.linalg.inv( np.cov(post_unc.T, aweights=None) )
+        mhl = mahalanobis(map_val, avg_val, inv_cov)
+        thre = get_threshold(confidence_map, x_dim)
+        if mhl**2 >= thre:
+            # find alternative MAP
+            if verbose:
+                print(f"MAP point is outside the {confidence_map*100:.1f}% confidence region. Finding alternative MAP point...")
+            mhl_smps = np.zeros(len(post_unc))
+            for j, p in enumerate(post_unc):
+                mhl_smps[j] = mahalanobis(p, avg_val, inv_cov)
+            # use argmin(mhl_smps)
+            arg_map = np.argmin(mhl_smps)
+            map_val = post_unc[arg_map]
+            arg_map = np.where(ind_unc)[0][arg_map] # get the index in the original posterior
+            
+    # Find error calculating region
+    roi_unc = llike > np.max(llike) - 2.0 # First filtering
+    post_unc = posterior[roi_unc]
+    llike_unc = llike[roi_unc]
+    if robust_unc:
+        # 2nd filter: use mahalanobis distance to exclude outliers in the uncertainty region
+        weights = np.exp(llike_unc)
+        inv_cov = np.linalg.inv( np.cov(post_unc.T, aweights=weights) )
+        mhl_smps = np.zeros(post_unc.shape[0])+np.nan
+        for j, p in enumerate(post_unc):
+            mhl_smps[j] = mahalanobis(p, map_val, inv_cov)
+        roi_filter = mhl_smps**2. < get_threshold(confidence_unc, x_dim)
+        unc_idx = np.where(roi_unc)[0]
+        roi_unc[unc_idx] = roi_filter
+
+    return arg_map, roi_unc
+        
+    
 
 
 # calculate_map, if plot=True, give simple horizontal figure
