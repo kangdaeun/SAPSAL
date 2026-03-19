@@ -440,7 +440,11 @@ def evaluate(c, astro=None, lsig_fix=None, only_veiled=False, map_method='maxll'
         # else:
         #     bins = nbin
         if param=='library':
-            bins=[np.arange(-0.5,1.51,1),np.arange(-0.5,1.51,1)]
+            # bins=[np.arange(-0.5,1.51,1),np.arange(-0.5,1.51,1)]
+            # find uqniue
+            unique_vals = np.unique(np.round(param_test[:, c.x_names.index('library')]))
+            bin_edges = np.append(unique_vals - 0.5, unique_vals[-1] + 0.5)
+            bins = [bin_edges, bin_edges]
         else:
             bins = nbin
         return bins
@@ -540,7 +544,7 @@ def evaluate(c, astro=None, lsig_fix=None, only_veiled=False, map_method='maxll'
             if c.use_flag == True:
                 flag_group = astro.create_random_flag(obs_group.shape[0])
             else:
-                flag_group = None,
+                flag_group = None
             
             # posterior per group
             post_list, llike_list = astro.exp.get_posterior(obs_group, c, N=N_PRED, use_group=True, group=GROUP_SIZE, 
