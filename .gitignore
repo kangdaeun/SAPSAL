@@ -24,8 +24,8 @@ ess_files/train_ftnet.py
 # networks/Stl_TGA_tpl/Stl_TGA_tpl.pt
 networks/v1_settl/v1_Settl_Net.pt
 networks/v2_k25/v2_K25_Net.pt
-networks/v2_k25/SpD_TGARL_Noise_mMUSE.pt.zip 
-networks/v1_settl/Stl_TGA_tpl.pt.zip 
+# networks/v2_k25/SpD_TGARL_Noise_mMUSE.pt.zip 
+# networks/v1_settl/Stl_TGA_tpl.pt.zip 
 
 
 # macOS 시스템 파일
