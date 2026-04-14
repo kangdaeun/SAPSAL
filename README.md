@@ -4,7 +4,8 @@
 
 # SAPSAL
 
-**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with Neural Networks)** is a deep learning toolkit for analysing optical stellar spectra observed with VLT/MUSE using conditional invertible neural networks (cINNs). SAPSAL is named after a Korean dog breed, the SAPSAL dog.
+**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young pre-main sequence stars (M-F types) from their optical spectra using conditional invertible neural networks (cINNs). The neural networks are first designed targeting VLT/MUSE data but it is applicable to other instruments as well. 
+SAPSAL is named after a Korean dog breed, the SAPSAL dog.
 
 SAPSAL networks give a full posterior distribution of stellar parameters (e.g. $$T_{\rm{eff}}$$, $$\rm{log} g$$,  $$A_{\rm{V}}$$,  $$r_{\rm{veil}}$$) from MUSE spectrum (4750 - 9350Å)
 
@@ -45,12 +46,12 @@ The following packages are required to run the scripts in this repository:
 You can download pre-trained networks in networks/. Currently (2025. 06), there are two networks available.
 
 
-| Network name | Short name | Codename | Parameters to predict | Source | Comments |
-|---------|---------|---------|---------|---------|---------|
-| SAPSAL-v1-Settl | Settl-Net | v1_Settl | 
-| SAPSAL-v2-K25   | K25-Net   | v2_K25   |
-| SAPSAL-v3-Vis   | Vis-Net   | v3_Vis   |
-| SAPSAL-v3-UV    | UV-Net    | v3_UV    |
+| Network name | Short name | Codename | Parameters to predict | Source | 
+|---------|---------|---------|---------|---------|
+| SAPSAL-v1-Settl | Settl-Net | v1_Settl | 3 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$ | [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) |
+| SAPSAL-v2-K25   | K25-Net   | v2_K25   | 4 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$r_{\rm{veil}}$$, library flag | [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) |
+| SAPSAL-v3-Vis   | Vis-Net   | v3_Vis   | 9 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$\rm{log} r_{\rm{veil}}$$, library flag, slab parameters ($$T_{\rm{slab}}$$, $$\rm{log} n_{\rm{e}}$$, $$\rm{log} \tau_{0}$$, $$\rm{log} F_{\rm{slab,norm}}$$) | Kang et al. 2026, _in prep._ | 
+| SAPSAL-v3-UV    | UV-Net    | v3_UV    | 9 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$\rm{log} r_{\rm{veil}}$$, library flag, slab parameters ($$T_{\rm{slab}}$$, $$\rm{log} n_{\rm{e}}$$, $$\rm{log} \tau_{0}$$, $$\rm{log} F_{\rm{slab,norm}}$$) | Kang et al. 2026, _in prep._ | 
 
 <!--
 | Network name | Parameters to predict | Comments |
@@ -61,7 +62,7 @@ You can download pre-trained networks in networks/. Currently (2025. 06), there 
 **SpD_TGARL_Noise_mMUSE** is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in the prediction process (i.e., Noise-Net mode). This network requires MUSE spectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) along the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
 -->
 
-In each network directory, you will find a configuration file (c_XXXX.py) and a zipped network (XXXX.pt.zip). First, unzip the network to get the network file (XXXX.pt). Please keep the configuration file and network file in the same directory (this is not necessary, but it makes reading the network a bit easier).
+In each network directory, you will find a configuration file (config_XXXX.py) and a zipped network (XXXX.pt.zip). First, unzip the network to get the network file (XXXX.pt). Please keep the configuration file and network file in the same directory (this is not necessary, but it makes reading the network a bit easier).
 
 You can find the jupyter notebook (Tutorial.ipynb) in examples/, which explains
 - how to read the network
@@ -90,7 +91,7 @@ MUSE wavelength for the whole range:
 If you use SAPSAL networks in your work, please cite the papers below.
 - [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html)
 - [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html)
-- Kang et al. 2025b, _in prep._
+- Kang et al. 2026, _in prep._
 - for all networks: [Ardizzone et al. 2019b](https://arxiv.org/abs/1907.02392), [Ardizzone et al. 2021](https://arxiv.org/abs/2105.02104)
 
 
