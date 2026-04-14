@@ -45,6 +45,9 @@ def get_flux_loc(y_names, use_bool=False):
         return flux_loc_bool
     else:
         return flux_loc
+    
+def get_wl_used(y_names):
+    return np.array([float(y_names[k][1:]) for k in get_flux_loc(y_names)])
 
 def get_spec_names_for_flux(y_names, wl, dwl=10):
    
@@ -301,7 +304,7 @@ def cardelli_extinction(wave, Av, Rv):
     # wave must be 1D array
 
     #ebv = Av/Rv
-
+    wave  = np.atleast_1d(wave)
     Av_arr = np.atleast_1d(Av)
     Rv_arr = np.atleast_1d(Rv)
     if Av_arr.shape != Rv_arr.shape:
@@ -952,7 +955,7 @@ def make_spt(only_int=False, option='Tr14'):
 from .execute import get_posterior as get_post
 from .execute import get_posterior_group as get_post_group
 
-def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, quiet=True, use_group=False, group=None):
+def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, verbose=False, use_group=False, group=None, group_limit=True):
     
     y_it = astro.obs_to_y(y)
     if astro.prenoise_training == True:
@@ -1002,9 +1005,9 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, qui
             
     
     if use_group:
-        output = get_post_group(y_it, astro, N=N, group=group, return_llike=return_llike, quiet=quiet)
+        output = get_post_group(y_it, astro, N=N, group=group, return_llike=return_llike, group_limit=group_limit, verbose=verbose)
     else:
-        output = get_post(y_it, astro, N=N, return_llike=return_llike, quiet=quiet)
+        output = get_post(y_it, astro, N=N, return_llike=return_llike, verbose=verbose)
     if return_llike:
         x = astro.x_to_params(output[0])
         return x, output[1]
@@ -1396,6 +1399,10 @@ title_unit_dic = {
     'log_tau0': r"log $\tau_{\mathrm{0,slab}}$",
     'tau0': r"$\tau_{\mathrm{0,slab}}$",
     'log_Fslab':r"log F$_{\mathrm{slab,norm}}$",
+
+    'Lbol': r"log L$_{*}$ (L$_{\odot}$)",
+    'Lacc': r"log L$_{\mathrm{acc}}$ (L$_{\odot}$)",
+    'Macc': r"$\dot{\mathrm{M}}_{\mathrm{acc}}$ (M$_{\odot}$ yr$^{-1}$)", 
 }
 
 title_dic = {
@@ -1415,6 +1422,10 @@ title_dic = {
     'log_tau0': r"log $\tau_{\mathrm{0,slab}}$",
     'tau0': r"$\tau_{\mathrm{0,slab}}$",
     'log_Fslab':r"log F$_{\mathrm{slab,norm}}$",
+
+    'Lbol': r"log L$_{*}$",
+    'Lacc': r"log L$_{\mathrm{acc}}$",
+    'Macc': r"$\dot{\mathrm{M}}_{\mathrm{acc}}$", 
     
     
     
@@ -1538,9 +1549,16 @@ def get_threshold(confidence, dof):
     return chi2.ppf(confidence, dof)
 
 # New MAP calculation based on max log-likelihood. option to change
-def find_map_zone(posterior, llike, robust_map=True, robust_unc=True, #config=None, 
-                    confidence_map=0.95, # robust_map mode 
+def find_map_zone(posterior, llike, robust_unc=True, #config=None, 
+                    weighted_medoid=False, 
+                    f_wmd=0.05, # fraction of samples in the high rank zone for weighted medoid.
+                    robust_map=True, confidence_map=0.95, # robust_map mode, when using argmax 
                     confidence_unc=0.95, # robust_err mode 
+                    f_unc=0.15, # fraction of samples in the uncertainty region
+                    # n_sig_threshold = 2.0, # threshold for the first filtering of uncertainty region (in log-likelihood unit). default is 2.0, which corresponds to 2-sigma
+                    # min_sample_fraction=0.01, # minimum fraction of samples in the uncertainty region (to avoid too small sample size for robust_unc)
+                    # n_sig_wmd = 1.0, 
+                    # min_sample_wmd = None,
                     verbose=False):
     """
     posterior: 2D array of shape (n_samples, n_parameters)
@@ -1557,31 +1575,76 @@ def find_map_zone(posterior, llike, robust_map=True, robust_unc=True, #config=No
     arg_map = np.argmax(llike)
     map_val = posterior[arg_map]
     x_dim = posterior.shape[1]
+    N_post = posterior.shape[0]
 
-    if robust_map:
-        ind_unc = llike > np.max(llike) - 2.0
-        post_unc = posterior[ind_unc]
+    # threshold = (n_sig_threshold**2)/2.0 # in log-likelihood unit, 2-sigma corresponds to 4.
 
-        # Check Mahalobis distance of the MAP point to the average point in the uncertainty region
-        avg_val = np.nanmean(post_unc, axis=0)
-        inv_cov = np.linalg.inv( np.cov(post_unc.T, aweights=None) )
-        mhl = mahalanobis(map_val, avg_val, inv_cov)
-        thre = get_threshold(confidence_map, x_dim)
-        if mhl**2 >= thre:
-            # find alternative MAP
-            if verbose:
-                print(f"MAP point is outside the {confidence_map*100:.1f}% confidence region. Finding alternative MAP point...")
-            mhl_smps = np.zeros(len(post_unc))
-            for j, p in enumerate(post_unc):
-                mhl_smps[j] = mahalanobis(p, avg_val, inv_cov)
-            # use argmin(mhl_smps)
-            arg_map = np.argmin(mhl_smps)
-            map_val = post_unc[arg_map]
-            arg_map = np.where(ind_unc)[0][arg_map] # get the index in the original posterior
-            
     # Find error calculating region
-    roi_unc = llike > np.max(llike) - 2.0 # First filtering
-    post_unc = posterior[roi_unc]
+    # roi_unc = llike > np.max(llike) - threshold
+    # if np.sum(roi_unc) < min_sample_fraction*len(posterior):
+    #     if verbose:
+    #         print(f"Warning: The number of samples in the uncertainty region is less than {min_sample_fraction*100:.1f}% of total samples. Increase the sigma threshold from {n_sig_threshold:g} to {n_sig_threshold+0.5:g}.")
+    #     n_sig_threshold += 0.5
+    #     threshold = (n_sig_threshold**2)/2.0 
+    #     roi_unc = llike > np.max(llike) - threshold # increase threshold to include more samples
+    roi_unc = llike > np.sort(llike)[::-1][int(f_unc*N_post)] # use fraction of samples to determine the uncertainty region. This is more robust than using a fixed log-likelihood threshold, which may not correspond to the same number of samples in different cases.
+
+    if weighted_medoid:
+        # if min_sample_wmd is None:
+        #     min_sample_wmd = 5*x_dim*(x_dim+1)/2
+            
+        # wmd_thre = (n_sig_wmd**2)/2.0
+        # roi_wmd = llike > np.max(llike) - wmd_thre
+        # sig_step = 0.1
+        # while np.sum(roi_wmd) < min_sample_wmd and n_wig_wmd<2.0-sig_step:
+        #     if verbose:
+        #         print(f"Warning: The number of samples in the WMD zone is less than requried {int(min_sample_wmd):d} samples. Increase the sigma threshold from {n_sig_wmd:g} to {n_sig_wmd+sig_step:g}.")
+        #     n_sig_wmd += sig_step
+        #     wmd_thre = (n_sig_wmd**2)/2.0
+        #     roi_wmd = llike > np.max(llike) - wmd_thre
+
+        # roi_wmd = llike > np.sort(llike)[::-1][n_high_rank]
+        roi_wmd = llike > np.sort(llike)[::-1][int(f_wmd*N_post)]
+            
+        post_wmd = posterior[roi_wmd]
+        weights = np.exp(llike[roi_wmd])
+        # Check Mahalobis distance of the MAP point to the average point in the uncertainty region
+        avg_val = np.average(post_wmd, axis=0, weights=weights)
+        inv_cov = np.linalg.inv( np.cov(post_wmd.T, aweights=weights) )
+        mhl_smps = np.zeros(len(post_wmd))
+        for j, p in enumerate(post_wmd):
+            mhl_smps[j] = mahalanobis(p, avg_val, inv_cov)
+        # use argmin(mhl_smps)
+        arg_map = np.argmin(mhl_smps)
+        map_val = post_wmd[arg_map]
+        arg_map = np.where(roi_wmd)[0][arg_map] # get the index in the original posterior
+        
+    else:    
+        arg_map = np.argmax(llike)
+
+        if robust_map:
+            post_unc = posterior[roi_unc]
+            weights = np.exp(llike[roi_unc])
+            # Check Mahalobis distance of the MAP point to the average point in the uncertainty region
+            # avg_val = np.nanmean(post_unc, axis=0)
+            avg_val = np.average(post_unc, axis=0, weights=weights)
+            inv_cov = np.linalg.inv( np.cov(post_unc.T, aweights=weights) )
+            mhl = mahalanobis(map_val, avg_val, inv_cov)
+            thre = get_threshold(confidence_map, x_dim)
+            if mhl**2 >= thre or weighted_medoid:
+                # find alternative MAP
+                if verbose and (mhl**2 >= thre):
+                    print(f"MAP point is outside the {confidence_map*100:.1f}% confidence region. Finding alternative MAP point...")
+                mhl_smps = np.zeros(len(post_unc))
+                for j, p in enumerate(post_unc):
+                    mhl_smps[j] = mahalanobis(p, avg_val, inv_cov)
+                # use argmin(mhl_smps)
+                arg_map = np.argmin(mhl_smps)
+                map_val = post_unc[arg_map]
+                arg_map = np.where(roi_unc)[0][arg_map] # get the index in the original posterior
+            
+    
+    post_unc = posterior[roi_unc] # First filtering
     llike_unc = llike[roi_unc]
     if robust_unc:
         # 2nd filter: use mahalanobis distance to exclude outliers in the uncertainty region
@@ -2725,7 +2788,7 @@ def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_
     
     return np.log10(L_acc_post)
 
-def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, bc7500=0,
+def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, bc7500=0, wl0=7500, n_bins=3,
                         y_err=None, distance_err=None, final_unit=1, 
                         use_Hslab_veiling=False, use_one_Hslab_model=False, Tslab_values=None, logne_values=None, logtau0_values=None,
                         slab_kwargs={"wl_sp": 7500, "Zi":1, "wl_sp_unit":units.AA, "include_Hn":True, "Int_lam":True, "lam_unit":units.AA}
@@ -2789,13 +2852,15 @@ def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, 
                 raise ValueError(f"Slab variables and r_values have differenet size.")
            
             fslab = np.array( [HSlabModel.get_total_intensity(wl, t, 10**ne, 10**tau, **slab_kwargs) for t, ne, tau in zip(Tslab_values, logne_values, logtau0_values)] )
-            f750_array = get_f750(wl, fslab)
+            # f750_array = get_f750(wl, fslab)
+            f750_array = get_flux_at(wl, fslab, target_wl=slab_kwargs["wl_sp"])
             fslab_norm = fslab / f750_array.reshape(-1,1)
     else:
         fslab_norm=None
 
     y_phot, veiling = remove_veil(wl, y_drd, r_values, fslab_norm = fslab_norm, return_veil=True)
-    f750 = get_f750(wl, y_phot) # f750 for MC/posterior cases (from dereddend)
+    f750 = get_flux_at(wl, y_phot, target_wl=wl0, n_bins=n_bins) # f750 for MC/posterior cases (from dereddend)
+
 
     # use bc
     Fbol_post = 10**bc7500 * f750 # erg/s/cm2
@@ -2806,7 +2871,7 @@ def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, 
     return np.log10(Lbol750)
 
 def run_Lum_post(wl, y_obs,  Av_values, Rv_values, r_values, run_Lbol=False, run_Lacc=False,
-                        distance=1, bc7500=0, Fslab_norm=None,
+                        distance=1, bc7500=0, Fslab_norm=None, wl0=7500, n_bins=3,
                         y_err=None, distance_err=None, final_unit=1, 
                         use_Hslab_veiling=False, use_one_Hslab_model=False, Tslab_values=None, logne_values=None, logtau0_values=None,
                         slab_kwargs={"wl_sp": 7500, "Zi":1, "wl_sp_unit":units.AA, "include_Hn":True, "Int_lam":True, "lam_unit":units.AA},
@@ -2814,7 +2879,7 @@ def run_Lum_post(wl, y_obs,  Av_values, Rv_values, r_values, run_Lbol=False, run
     
     # run Lbol
     if run_Lbol:
-        Lbol_post = calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=distance, bc7500=bc7500, 
+        Lbol_post = calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=distance, bc7500=bc7500, wl0=wl0, n_bins=n_bins,
                             y_err=y_err, distance_err=distance_err, final_unit=final_unit, 
                             use_Hslab_veiling=use_Hslab_veiling, use_one_Hslab_model=use_one_Hslab_model, 
                             Tslab_values=Tslab_values, logne_values=logne_values, logtau0_values=logtau0_values,
