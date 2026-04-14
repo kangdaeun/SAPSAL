@@ -29,7 +29,7 @@ additional_kwarg = {'R_V': 4.4, 'f_min_dic': {'A_V': 0.1, 'veil_r': 0.3}}
  
 # name of output network, Ex) output/xxxx_network.pt
 # Do not forget to make upper directory if you use
-filename = 'SpD_TGARL_Noise_mMUSE.pt'
+filename = 'v2_K25.pt'
  
 # name (inculuding path) of database
 tablename = 'Database/ecogal_spectra_ts_Settl_plus_Dusty_Pristine.csv'

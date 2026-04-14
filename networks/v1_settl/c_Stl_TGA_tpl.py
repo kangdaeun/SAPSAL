@@ -22,7 +22,7 @@ y_names = ['l{:d}'.format(i) for i in range(750, 3681-1)]
  
 # name of output network, Ex) output/xxxx_network.pt
 # Do not forget to make upper directory if you use
-filename = 'Stl_TGA_tpl.pt'
+filename = 'v1_Settl_Net.pt'
  
 # name (inculuding path) of database
 tablename = 'Database/ecogal_spectra_ts_Settl_AV0to10.csv'
