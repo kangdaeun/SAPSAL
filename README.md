@@ -107,11 +107,13 @@ This project is licensed under the **MIT License**.
     * **Note:** This project includes a modified version based on FrEIA v0.2. It has been customized for this specific implementation and may differ from the latest upstream version. (See [Installation requirements](#installation-requirements) for details).
  
 * **FRAPPE** ([https://github.com/RikClaes/FRAPPE](https://github.com/RikClaes/FRAPPE)):
-    * This project incorporates code from the repository above for resimulation of some networks.
-    * **Note:** The original code did not have a specific license file at the time of integration (2026.02.09). We have included a slightly modified version (with 1-2 lines of minor modifications). 
-    * All rights to the original logic belong to the original author(s).
+    * This project incorporates components from the FRAPPE for the resimulation pipeline (specifically for Vis-Net and UV-Net).
+    * To ensure compatibility with our trained models, we provide a frozen version based on FRAPPE v0.1 ([https://github.com/RikClaes/FRAPPE_ClassIII_interpolations](https://github.com/RikClaes/FRAPPE_ClassIII_interpolations))
+    * **Note on Modifications:** We have included minor modifications (with 1-2 lines) to ensure seamless integration with the SAPSAL environment. 
+    * **Credit:s** All rights to the original logic belong to the original author(s). Please cite the original FRAPPE repositories and [Claes et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...690A.122C/abstract) if you use the resimulation functions for Vis-Net or UV-Net.
 
 <!--
+* **Note:** The original code did not have a specific license file at the time of integration (2026.02.09). We have included a slightly modified version (with 1-2 lines of minor modifications). 
 ## Features
 
 - Conditional Invertible Neural Network (cINN) implementation based on [FrEIA](https://github.com/vislearn/FrEIA)
