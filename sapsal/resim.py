@@ -389,9 +389,9 @@ def prepare_frappe_grid( wl_grid = 'X-shooter', only_range=False, verbose=False 
                 elif ii+1==len(spec): new_val = spec[ii-1]
                 else: new_val = np.nanmean([spec[ii-1], spec[ii+1]])
                 flux_matrix[ii,i] = new_val
-        if len(i_nan)+len(i_neg)>0:
-            if verbose:
-                print(f"{spt_in_grid[i]}: {len(i_nan)} NaN, {len(i_neg)} Neg cases modified")
+        # if len(i_nan)+len(i_neg)>0:
+        #     if verbose:
+        #         print(f"{spt_in_grid[i]}: {len(i_nan)} NaN, {len(i_neg)} Neg cases modified")
     cint.medInterp = flux_matrix
     if verbose:
         print("===================================\n")
@@ -444,7 +444,7 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
         if np.sum(roi_frappe)>0: 
             # Prepare SpTind for frappe resimulation (SpT is string so..)
             resim_table['SpTind'] = np.zeros(len(resim_table))+np.nan
-            resim_table['SpTind'][np.where(roi_frappe)[0]] = [exp.convert_temp_to_sptnum(10**lt, option='Tpl') for lt in resim_table['logTeff'][roi_frappe]]
+            resim_table['SpTind'][np.where(roi_frappe)[0]] = [exp.convert_temp_to_sptnum(10**lt, option='Tpl', out_nan=True) for lt in resim_table['logTeff'][roi_frappe]]
     elif grid_model=='phoenix':
         roi_phoenix = np.ones(len(resim_table)).astype(bool)
         roi_frappe = np.invert(roi_phoenix)
@@ -577,9 +577,15 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
         spt_list = resim_table_part['SpT'].data
         # Check NaN SpT: 'nan', '' or 'none' 'None' None -> weired SpTind values that cannot be converted to SpT 
         invalid_values = ['', np.nan, 'none', 'nan', 'None', None]
-        roi_spt_invalid = np.isin(spt_list, invalid_values)
+        # roi_spt_invalid = np.isin(spt_list, invalid_values)
+        roi_spt_invalid = np.zeros(len(spt_list)).astype(bool)
+        for i, x in enumerate(spt_list):
+            # 1. NaN 체크 (x != x 가 가장 빠름)
+            if x != x: roi_spt_invalid[i] = True
+            # 2. None 및 쓰레기 문자열 체크
+            if x in invalid_values: roi_spt_invalid[i] = True
+    
         # original FRAPPE spt_coding function accepts upto B-type. Now it can anyway convert O-type as well
-        
         if verbose:
             print(f"\tInvalid SpT(SpTind) cases: {np.sum(roi_spt_invalid)} models")
         
@@ -609,19 +615,44 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
         # If lib=-1, T>T_frappe (Tout) but T<7000
         if grid_model=='phoenix_and_frappe' and np.sum(roi_spt_ext) > 0:
             print('\t !!changed applied')
-            roi_hot = (sptcode_list < sptcode_min) * np.invert(roi_spt_invalid) * (resim_table_part['logTeff'] <= 7000)
+            settl_name = 'Settl_new' #if phoenix_type=='SpD' else 'Settl'
+            ASS_dic, resim_db_range_dic = prepare_phoenix_grid(grid_names = [settl_name], wl_grid = wl_grid)
+            settl_range = resim_db_range_dic[settl_name]
+
+            roi_hot = (sptcode_list < sptcode_min) * np.invert(roi_spt_invalid) * (resim_table_part['logTeff'] <= settl_range['logTeff'][1])
             if np.sum(roi_hot)>0:
                 idx_hot = final_idx[roi_hot]
                 resim_table['flag_resim'][idx_hot] = 1 
                 resim_table['flag_settl'][idx_hot] = 1
                 resim_table['flag_frappe'][idx_hot] = 0
                 resim_table['flag_phoenix'][idx_hot] = 1
+
+                roi_logg_out = roi_hot * np.logical_or(resim_table_part['logG'] > settl_range['logG'][1], resim_table_part['logG'] < settl_range['logG'][0])
+                if np.sum(roi_logg_out)>0:
+                    idx_hot_loggout = final_idx[roi_logg_out]
+                    if clip_logG:
+                        if verbose:
+                            print("\tClip log g: %d models."%np.sum(roi_logg_out))
+                        resim_table['logG'][idx_hot_loggout] = np.clip(resim_table_part['logG'][roi_logg_out], a_max=settl_range['logG'][1], a_min=settl_range['logG'][0])
+                    else:
+                        resim_table['flag_resim'][idx_hot_loggout] = 0 # no resm
+                        resim_table['flag_settl'][idx_hot_loggout] = 0 # no settl
+                        resim_table['flag_phoenix'][idx_hot_loggout] = 0 # no phoe
+                        resim_table['flag_frappe'][idx_hot] = 1 # back to frappe but failed resim
+
                 if verbose:
-                    print("\tChange FRAPPE-cases with T>G8 to Settl")
+                    print("\tChange FRAPPE-cases with T>G8 available for resimulation to Settl")
 
     
     return resim_table
 
+
+def get_wavelength(wl_grid='X-shooter'):
+    wl_muse = np.arange(4750.1572265625, 9351.4072265625, 1.25)
+    wlmin = 3200; wlmax = 10000; dwl = 1
+    wl_xshooter = np.concatenate( [np.arange(wlmin, np.floor(wl_muse[0]), dwl), wl_muse, np.arange(np.ceil(wl_muse[-1]), wlmax+dwl, dwl)] )
+    if wl_grid=='MUSE': return wl_muse
+    elif wl_grid=='X-shooter': return wl_xshooter
 
 def run_photosphere(resim_table,  wl_grid='X-shooter', grid_model='phoenix', phoenix_type='SpDx', 
                     chunk_size=5000, 
@@ -961,11 +992,12 @@ def run_veiling_and_extinction(resim_table, phot_resim, wl_grid='X-shooter',
     
     return outputs
 
-def extract_resim_used(spec_resim, config):
+def extract_resim_used(spec_resim, config, wl_grid='X-shooter'):
     """
     Extract resimulated spectra only used in network. (with network foramt)
     spec_resim: array of resimulated spectra. shape (N_models, N_wl)
     config: network config object
+    wl_grid: 'MUSE' or 'X-shooter'
     
     return: array of extracted spectra. shape (N_models, N_used)
     resim_used is the spectra still before normalization.
@@ -974,12 +1006,19 @@ def extract_resim_used(spec_resim, config):
         spec_resim = spec_resim.reshape(1,-1)
     n_models = spec_resim.shape[0]
 
+    wl_muse = np.arange(4750.1572265625, 9351.4072265625, 1.25)
+    wlmin = 3200; wlmax = 10000; dwl = 1
+    wl_xshooter = np.concatenate( [np.arange(wlmin, np.floor(wl_muse[0]), dwl), wl_muse, np.arange(np.ceil(wl_muse[-1]), wlmax+dwl, dwl)] )
+
+    if wl_grid=='MUSE': wl = wl_muse
+    elif wl_grid=='X-shooter': wl = wl_xshooter
+
     # Extract data only used in network. (with network foramt)
     arg_ntf = exp.get_spec_index(config.y_names) # for spectrum based network
     if len(arg_ntf)==0:
         # spec_network = False
         # flux-based networks -> need to calculate median flux for normalization
-        spec_names_nested = exp.get_spec_names_for_flux(config.y_names, wl=exp.get_wl(config), dwl=10) # bins to calculate median fluxes
+        spec_names_nested = exp.get_spec_names_for_flux(config.y_names, wl=wl, dwl=10) # bins to calculate median fluxes
         final_data = np.zeros(shape=(n_models,len(spec_names_nested)))+np.nan
         for i, names in enumerate(spec_names_nested):
             final_data[:, i] = np.median( spec_resim[:, [int(k[1:]) for k in names]], axis=1 )
@@ -987,7 +1026,7 @@ def extract_resim_used(spec_resim, config):
     else:
         # spec_network = True
         final_data = spec_resim[:, arg_ntf] 
-        wl = exp.get_wl(config) # for X-shooter, exp.get_wl(c) only gives blue+vis_muse. but resimulation includes red part. 
+        # wl = wl # for X-shooter, exp.get_wl(c) only gives blue+vis_muse. but resimulation includes red part. 
         # Here, we do not need red part, but just need wl that matches index 
         wl_data = wl[arg_ntf] 
 
@@ -997,7 +1036,7 @@ def extract_resim_used(spec_resim, config):
 
     return outputs
 
-def get_normalize_factor(spec_resim, config, return_outputs=False, verbose=False):
+def get_normalize_factor(spec_resim, config, wl_grid='X-shooter',return_outputs=False, verbose=False):
     """
     Calculate normalization factor following network config.
     spec_resim: array of resimulated spectra. shape (N_models, N_wl)
@@ -1025,7 +1064,7 @@ def get_normalize_factor(spec_resim, config, return_outputs=False, verbose=False
     else:
         spec_network = True
 
-    outputs = extract_resim_used(spec_resim, config)
+    outputs = extract_resim_used(spec_resim, config, wl_grid=wl_grid)
     final_data = outputs['resim_used']
     wl_data = outputs['wl_used']
 
@@ -1142,7 +1181,7 @@ def run_resimulation(param_table, wl_grid='MUSE', grid_model='phoenix', phoenix_
     
     if return_normalization:
         if config.normalize_flux: # only when the network is trained on normalized flux
-            add_output = get_normalize_factor(output['spec_resim'], config, return_outputs=True, verbose=verbose)
+            add_output = get_normalize_factor(output['spec_resim'], config, wl_grid=wl_grid, return_outputs=True, verbose=verbose)
             # get data used in network as well by return_outputs=True
             output.update(add_output) # add resim_used, wl_used, norm_factor
 
