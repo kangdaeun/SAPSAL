@@ -3155,7 +3155,7 @@ def train_noisy_network(c): # c is cINNConfig class variable
 """
 
 
-def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
+def get_posterior(y_it, c, N=4096, return_llike=False, verbose=False):
     
     # import torch
     if c.network_model is None:
@@ -3166,7 +3166,7 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
     # model = eval(c.model_code)(c)
     # model.load(c.filename, device=c.device)
     
-    if not quiet:
+    if verbose:
         print('Use %s'%(c.model_code))
         print('Use %s'%(c.filename))
 
@@ -3236,7 +3236,7 @@ def get_posterior(y_it, c, N=4096, return_llike=False, quiet=False):
     else:
         return np.array(outputs)
     
-def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=False):
+def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, group_limit=True, verbose=False):
     
     # import torch
     if c.network_model is None:
@@ -3244,7 +3244,7 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
     model = c.network_model
     model.eval()
     
-    if not quiet:
+    if verbose:
         print('Use %s'%(c.model_code))
         print('Use %s'%(c.filename))
 
@@ -3275,12 +3275,13 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, quiet=F
         llikes = []
         
     # g_max = int(1e8/(c.x_dim*2+c.y_dim_in)/N)
-    g_max = int(4e6/N)
-    if g_max < 1: g_max = 10
-    if group is None:
-        group = g_max
-    elif group > g_max:
-        group = g_max
+    if group_limit:
+        g_max = int(4e6/N)
+        if g_max < 1: g_max = 10
+        if group is None:
+            group = g_max
+        elif group > g_max:
+            group = g_max
         
     n_group = n_samp//group
     if n_samp%group > 0:

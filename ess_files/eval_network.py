@@ -549,7 +549,7 @@ def evaluate(c, astro=None, lsig_fix=None, only_veiled=False, map_method='maxll'
             # posterior per group
             post_list, llike_list = astro.exp.get_posterior(obs_group, c, N=N_PRED, use_group=True, group=GROUP_SIZE, 
                                                 unc=unc_group, flag=flag_group,
-                                                return_llike=True, quiet=True)
+                                                return_llike=True, verbose=False)
             
             
             # RMSE for all post
