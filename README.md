@@ -11,7 +11,7 @@ SAPSAL networks give a full posterior distribution of stellar parameters (e.g. $
 This repository provides Python codes to build and run the SAPSAL networks introduced in the following papers:
 - [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html)
 - [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html)
-- Kang et al. 2025b, _in prep._
+- Kang et al. 2026, _in prep._
 
 
 ## Installation requirements
@@ -44,12 +44,22 @@ The following packages are required to run the scripts in this repository:
 
 You can download pre-trained networks in networks/. Currently (2025. 06), there are two networks available.
 
+
+| Network name | Short name | Codename | Parameters to predict | Source | Comments |
+|---------|---------|---------|---------|---------|---------|
+| SAPSAL-v1-Settl | Settl-Net | v1_Settl | 
+| SAPSAL-v2-K25   | K25-Net   | v2_K25   |
+| SAPSAL-v3-Vis   | Vis-Net   | v3_Vis   |
+| SAPSAL-v3-UV    | UV-Net    | v3_UV    |
+
+<!--
 | Network name | Parameters to predict | Comments |
 |---------|---------|---------|
-| Stl_TGA_tpl | Teff, log g, Av (no veiling)  |  cINN trained only on BT-Settl, presented in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) <br>Trained on fixed Rv value of 4.4 |
+| v1-Settl | Teff, log g, Av (no veiling)  |  cINN trained only on BT-Settl, presented in [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) <br>Trained on fixed Rv value of 4.4 |
 | SpD_TGARL_Noise_mMUSE  |  Teff, log g, Av, r_veil, library flag  | cINN presented in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) <br>Trained on BT-Settl and Dusty<br>Trained on fixed Rv value of 4.4|
 
 **SpD_TGARL_Noise_mMUSE** is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in the prediction process (i.e., Noise-Net mode). This network requires MUSE spectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) along the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
+-->
 
 In each network directory, you will find a configuration file (c_XXXX.py) and a zipped network (XXXX.pt.zip). First, unzip the network to get the network file (XXXX.pt). Please keep the configuration file and network file in the same directory (this is not necessary, but it makes reading the network a bit easier).
 
