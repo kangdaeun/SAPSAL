@@ -8,6 +8,17 @@ ess_files/feature_importance_new.py
 ess_files/frp_resim_Tr14.py
 ess_files/frp_resim_eval.py
 ess_files/eval_Rv_depence_models.py
+ess_files/count_peaks.py
+ess_files/map_methods_stability_test.py
+ess_files/map_methods_stability_test_ver2.py
+ess_files/mxlmap_reliability_test.py 
+ess_files/new_accuracy_test.py   
+ess_files/new_accuracy_test_ver2.py
+ess_files/plot_Ddistribution.py
+ess_files/test_classIII_stars.py
+ess_files/feature_importance.py 
+ess_files/train_ftnet.py 
+
 networks/SpD_TGARL_Noise_mMUSE/SpD_TGARL_Noise_mMUSE.pt
 networks/SpD_TGARL_Noise_mMUSE/__pycache__/
 networks/Stl_TGA_tpl/Stl_TGA_tpl.pt
