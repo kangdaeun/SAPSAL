@@ -4,7 +4,7 @@ original: Stl_TGA_tpl_normtotalflux_40
 Settl library
 T: 2600~7000 (in log)
 g: 2.5 ~ 5 (in log)
-Av: 0 ~ 10 mag
+Av: 0 ~ 10 mag (Rv=4.4 fixed)
 for template range: ['l{:d}'.format(i) for i in range(750, 3681-1)]
 normalized by total flux (within the corresponding wavelength range)
 

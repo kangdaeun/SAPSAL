@@ -4,7 +4,7 @@ Settl + Dusty library
 Noise-Net
 T: 2600~7000
 g: 2.5 ~ 5
-Av: 0 ~ 10 (random sampling during training) + f_min = 0.1
+Av: 0 ~ 10 (random sampling during training) + f_min = 0.1, Rv=4.4 (fixed)
 r: 0 ~ 2 (random sampling during tarining)  + f_min = 0.5
 
 library : 0=Settl, 1=Dusty
@@ -29,7 +29,7 @@ additional_kwarg = {'R_V': 4.4, 'f_min_dic': {'A_V': 0.1, 'veil_r': 0.3}}
  
 # name of output network, Ex) output/xxxx_network.pt
 # Do not forget to make upper directory if you use
-filename = 'v2_K25.pt'
+filename = 'v2_K25_Net.pt'
  
 # name (inculuding path) of database
 tablename = 'Database/ecogal_spectra_ts_Settl_plus_Dusty_Pristine.csv'

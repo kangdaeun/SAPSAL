@@ -19,10 +19,11 @@ ess_files/test_classIII_stars.py
 ess_files/feature_importance.py 
 ess_files/train_ftnet.py 
 
-networks/SpD_TGARL_Noise_mMUSE/SpD_TGARL_Noise_mMUSE.pt
-networks/SpD_TGARL_Noise_mMUSE/__pycache__/
-networks/Stl_TGA_tpl/Stl_TGA_tpl.pt
-
+# networks/SpD_TGARL_Noise_mMUSE/SpD_TGARL_Noise_mMUSE.pt
+# networks/SpD_TGARL_Noise_mMUSE/__pycache__/
+# networks/Stl_TGA_tpl/Stl_TGA_tpl.pt
+networks/v1_settl/v1_Settl_Net.pt
+networks/v2_k25/v2_K25_Net.pt
 
 
 # macOS 시스템 파일
