@@ -5,6 +5,7 @@
 # SAPSAL
 
 **SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young pre-main sequence stars (M-F types) from their optical spectra using conditional invertible neural networks (cINNs). The neural networks are first designed targeting VLT/MUSE data but it is applicable to other instruments as well. 
+
 SAPSAL is named after a Korean dog breed, the SAPSAL dog.
 
 SAPSAL networks give a full posterior distribution of stellar parameters (e.g. $$T_{\rm{eff}}$$, $$\rm{log} g$$,  $$A_{\rm{V}}$$,  $$r_{\rm{veil}}$$) from MUSE spectrum (4750 - 9350Å)
@@ -20,18 +21,24 @@ The following packages are required to run the scripts in this repository:
 
 | Package | Version | Comment |
 |---------|---------|---------|
+| **Essential** |
 | python  | >= 3.11.7   |  
 | numpy   |  >= 1.26  | 
 | Pytorch | >= 2.2.2  | need torch and torchvision, get [here](https://pytorch.org/) |
 | pandas   | >= 2.1.4 |
-| tqdm | >= 4.65.0 |
-| matplotlib | >= 3.8.0 |
-| GPUtil | >= 1.4.0 | not necessary, only for automatic CUDA GPU search and selection, <br> get [here](https://github.com/anderskm/gputil) |
-| KDEpy | >= 1.1.9 | for MAP calcuation, get [here](https://kdepy.readthedocs.io/en/latest/index.html) |
-| scipy | >= 1.11.4 |
 | astropy | >= 5.3.4 |
-| scikit-learn | >= 1.2.2 |
-| numba | >= 0.59.0 | Used in hydrogen slab codes (HSlabModel.py) |
+| matplotlib | >= 3.8.0 |
+| scipy | >= 1.11.4 |
+| tqdm | >= 4.65.0 |
+| **Recommended** |
+| numba | >= 0.59.0 | Used in hydrogen slab codes (HSlabModel.py). NEEDED when using resimulation for SAPSAL-v3s |
+| localreg | >= 0.5.0 | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://https://github.com/sigvaldm/localreg) |
+| ray | >= 2.44.0  | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://docs.ray.io/en/latest/index.html#) ray[default] is enough|
+| **Optional** |
+| GPUtil | >= 1.4.0 | for automatic CUDA GPU search and selection <br> (find_gpu_available function in expander.py), <br> Get [here](https://github.com/anderskm/gputil) |
+| KDEpy | >= 1.1.9 | for 1D MAP calcuation <br> (calculate_map function in expander.py), <br> get [here](https://kdepy.readthedocs.io/en/latest/index.html) |
+| scikit-learn | >= 1.2.2 | (NOT used for trained network) |
+| umap | >= 0.5.7 | (NOT used for trained network) <br> get [here](https://umap-learn.readthedocs.io/en/latest/)  |
 > ⚠️ Note: The versions listed are the ones tested with this repository.  
 > Earlier versions may also work, but compatibility is not guaranteed.
 
