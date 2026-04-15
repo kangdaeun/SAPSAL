@@ -31,7 +31,7 @@ import numpy as np
 import torch # get loader
 import torch.utils.data
 import sys #, os
-import multiprocessing
+
 # import importlib.util
 
 from .cINN_config import cINNConfig
@@ -81,6 +81,7 @@ def stddev_matrix(X):
 
 
 def get_num_workers():
+    import multiprocessing
     try:
         if torch.backends.mps.is_available():
             return 0

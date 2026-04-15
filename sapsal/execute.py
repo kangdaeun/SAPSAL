@@ -195,8 +195,6 @@ Modified train_network (2022.08.30)
 - verbose, etc sentences
 """
 
-
-    
 def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c is cINNConfig class variable
 
     t_start = time()
@@ -1584,7 +1582,7 @@ def train_network_DAwoD(c, data=None, verbose=True, max_epoch=1000): # c is cINN
     # return epoch_loss_history
 
     
-
+# Deprecated
 def train_prenoise_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNConfig class variable
 
     t_start = time()
@@ -3420,15 +3418,16 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, group_l
 #         return np.array(outputs)
     
     
+# DEPRECATED
 # It is better to use get_posterior and calculate both posterior and llike at once - reduce error and computational time
 # Error ~ 1e-4 (|llike from get_posterior - llike from get_log_likelihood|)
-def get_log_likelihood(y_it, x_it, c, quiet=False):
+def get_log_likelihood(y_it, x_it, c, verbose=False):
         
     if c.network_model is None:
         c.load_network_model()
     model = c.network_model
     
-    if not quiet:
+    if verbose:
         print('Use %s'%(c.model_code))
         print('Use %s'%(c.filename))
     
@@ -3445,9 +3444,8 @@ def get_log_likelihood(y_it, x_it, c, quiet=False):
 
         zz = torch.sum(z_used**2., dim=1)
         log_likelihood = -(0.5*zz) + jac
-        llikes.append(log_likelihood.to('cpu').detach().numpy())
+        llikes.append(log_likelihood.to('cpu').detach().numpy() -0.5 * c.x_dim * np.log(2 * np.pi) + np.log( np.linalg.det(c.w_x)) )
     
     return np.array(llikes)
-
 
 

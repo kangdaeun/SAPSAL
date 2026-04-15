@@ -8,9 +8,9 @@ Created on Thu Aug  5 15:13:26 2021
 cINN network config class
 
 Currently availbale Models for Main Network (2): Glow, AllinOne
-- 사용자가 무엇을 선택하냐에 따라 필수적으로 들어가야하는 파라미터가 있고, 이 부분에 대한 설정이 없으면 안됨
+
  
-할지 말지의 flag에 해당하는 것은 무조건 True/False로 (None말고)
+flag is always True/False로 (no None)
 
 Need to set in config by user:
     Output file name

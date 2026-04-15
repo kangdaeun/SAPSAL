@@ -16,12 +16,11 @@ import sys
 import pandas as pd
 # When reading files in package (files are saved in data/)
 from importlib import resources
-import pickle
-import gzip
+# import pickle
+# import gzip
 
 import multiprocessing as mp
 import astropy.units as units
-
 
 
 from . import expander as exp
@@ -260,32 +259,6 @@ def prepare_phoenix_grid(grid_names = ['Settl', 'Dusty', 'Settl_new', 'Dusty_new
         if not isinstance(ASS_dic[name], pd.DataFrame):
             ASS_dic[name] = pd.DataFrame(ASS_dic[name])
 			
-        # if name=='Settl':
-        #     if wl_grid=='MUSE':
-        #         ASS_dic[name] = pd.read_pickle(db_pipe+"spectral_libraries/SynthSpecDF-BT-Settl_29072022.pkl") # old Settl MUSE
-        #     elif wl_grid=='X-shooter':
-        #         with gzip.open(db_pipe+"spectral_libraries/XS_BT-Settl-CIFIST_Fb_SynthSpecDF_20250828.pkl.gz", 'rb') as f:
-        #             ASS_dic[name] = pd.read_pickle(f)
-        # if name=='Dusty':
-        #     if wl_grid=='MUSE':
-        #         ASS_dic[name] = pd.read_pickle(db_pipe+"spectral_libraries/Restricted_mp_Dusty-last.SynthSpecDF_29092022.pkl") # old Dusty MUSE
-        #     elif wl_grid=='X-shooter':
-        #         with gzip.open(db_pipe+"spectral_libraries/XS_BT-Dusty_Fb_SynthSpecDF_20250828.pkl.gz", 'rb') as f:
-        #             ASS_dic[name] = pd.read_pickle(f)
-        # if name=='Settl_new':
-        #     if wl_grid=='MUSE':
-        #         with gzip.open(db_pipe+"spectral_libraries/MUSE_BT-Settl-CIFIST_Fb_SynthSpecDF_20250708.pkl.gz", 'rb') as f:
-        #             ASS_dic[name] = pd.read_pickle(f)
-        #     elif wl_grid=='X-shooter':
-        #         with gzip.open(db_pipe+"spectral_libraries/XS_BT-Settl-CIFIST_Fb_SynthSpecDF_20250828.pkl.gz", 'rb') as f:
-        #             ASS_dic[name] = pd.read_pickle(f)
-        # if name=='Dusty_new':
-        #     if wl_grid=='MUSE':
-        #         with gzip.open(db_pipe+"spectral_libraries/MUSE_BT-Dusty_Fb_SynthSpecDF_20250708.pkl.gz", 'rb') as f:
-        #             ASS_dic[name] = pd.read_pickle(f)
-        #     elif wl_grid=='X-shooter':
-        #         with gzip.open(db_pipe+"spectral_libraries/XS_BT-Dusty_Fb_SynthSpecDF_20250828.pkl.gz", 'rb') as f:
-        #             ASS_dic[name] = pd.read_pickle(f)
     
     db_range_dic = {}
     for key, df in ASS_dic.items():

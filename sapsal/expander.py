@@ -2,6 +2,9 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
+import matplotlib.cm as cm
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import copy
 import sys
 import os
 from astropy.io import ascii
@@ -11,7 +14,7 @@ if sys.version_info >= (3, 9):
 else:
     import pkgutil
     
-import multiprocessing as mp 
+
 import astropy.units as units
 # float_dtype = np.float64
 # int_dtype = np.int64
@@ -158,75 +161,6 @@ def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_
         return (params, (obs, temp_obs))
     else:
         return (params, obs)
-
-
-# def divide_xy(table, x_names, y_names, random_parameters=None, random_seed=0, f_min_dic=None, f_max_dic=None,
-#               exclude = []):
-    
-#     table_cols = table.columns.values.tolist()
-#     # N_data = len(table)
-#     # params = np.zeros( (N_data, len(x_names)) ) + np.nan
-#     # spec = np.zeros( (N_data, len(y_names))) + np.nan
-    
-#     # all_in_table = set(x_names + y_names).issubset(table_cols) # all x_names and y_naems are in table
-
-#     if random_parameters is None:
-#         params = table.loc[:, x_names].values # if all x_names in table already, just read
-#         spec = table.loc[:, y_names].values
-        
-#     else:
-#         rparams = list(random_parameters.keys())
-#         xn_in_rp = [k for k in x_names if k in rparams ]
-#         yn_in_rp = [k for k in y_names if k in rparams ]
-        
-#         xn_nin_rp = [k for k in x_names if k not in rparams ]
-#         yn_nin_rp = [k for k in y_names if k not in rparams ]
-        
-#         params = table.loc[:, xn_nin_rp]
-#         spec = table.loc[:, yn_nin_rp]
-        
-#         np.random.seed(int(random_seed))
-        
-#         if len(xn_in_rp)>0:
-#             for param in xn_in_rp:
-#                 mini, maxi = random_parameters[param]
-#                 f_min, f_max = 0., 0.
-#                 try: 
-#                     f_min = f_min_dic[param]
-#                 except: 
-#                     pass
-#                 try:
-#                     f_max = f_max_dic[param]
-#                 except:
-#                     pass
-                
-#                 ii = x_names.index(param)
-#                 rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
-#                                                                f_min=f_min, f_max=f_max)
-#                 params.insert(ii, param, rval)
-                
-#         if len(yn_in_rp)>0:
-#             for param in yn_in_rp:
-#                 mini, maxi = random_parameters[param]
-#                 f_min, f_max = 0., 0.
-#                 try:
-#                     f_min = f_min_dic[param]
-#                 except:
-#                     pass
-#                 try:
-#                     f_max = f_max_dic[param]
-#                 except:
-#                     pass
-                
-#                 ii = y_names.index(param)
-#                 rval =  generate_random_parameter(len(table), min_value=mini, max_value=maxi,
-#                                                                f_min=f_min, f_max=f_max)
-#                 spec.insert(ii, param, rval)
-                
-#         params = params.values
-#         spec = spec.values
-
-#     return (params, spec)
 
 
 def normalize_flux(obs_data, normalize_total_flux=None, normalize_mean_flux=None, normalize_f750=None, wl=None,):
@@ -401,33 +335,6 @@ def extinct_spectrum(wl, flux, Av_array, Rv_array):
     else:
         return extincted_flux
 
-    # single_data = True
-    # multi_Rv = False; multi_Av=False
-    # # check dimension of given Av and Rv
-    
-
-    # if len(np.array(Rv_array).shape)==1 and np.array(Rv_array).shape[0] == np.array(flux).shape[0]:
-    #     multi_Rv = True
-    #     single_data = False
-   
-    # if len(np.array(Av_array).shape)==1 and np.array(Av_array).shape[0] == np.array(flux).shape[0]:
-    #     multi_Av = True
-    #     single_data = False
-       
-        
-    # if single_data:
-    #     return flux * cardelli_extinction(wl, Av_array, Rv_array)
-    
-    # else:
-    #     if not multi_Av:
-    #         Av_array = np.repeat(Av_array, flux.shape[0])
-    #     if not multi_Rv:
-    #         Rv_array = np.repeat(Rv_array, flux.shape[0])
-        
-    #     for i in range(flux.shape[0]):
-    #         flux[i, :] = flux[i, :] * cardelli_extinction(wl, Av_array[i], Rv_array[i])
-        
-    #     return flux
     
 
 def deredden_spectrum(wl, flux, Av_array, Rv_array):
@@ -481,34 +388,6 @@ def deredden_spectrum(wl, flux, Av_array, Rv_array):
         return dereddened_flux
 
     
-    # single_data = True
-    # multi_Rv = False; multi_Av=False
-    # # check dimension of given Av and Rv
-
-    # if len(np.array(Rv_array).shape)==1 and np.array(Rv_array).shape[0] == np.array(flux).shape[0]:
-    #     multi_Rv = True
-    #     single_data = False
-   
-    # if len(np.array(Av_array).shape)==1 and np.array(Av_array).shape[0] == np.array(flux).shape[0]:
-    #     multi_Av = True
-    #     single_data = False
-       
-        
-    # if single_data:
-    #     return flux / cardelli_extinction(wl, Av_array, Rv_array)
-    
-    # else:
-    #     if not multi_Av:
-    #         Av_array = np.repeat(Av_array, flux.shape[0])
-    #     if not multi_Rv:
-    #         Rv_array = np.repeat(Rv_array, flux.shape[0])
-        
-    #     for i in range(flux.shape[0]):
-    #         flux[i, :] = flux[i, :] / cardelli_extinction(wl, Av_array[i], Rv_array[i])
-        
-    #     return flux
-
-
 
 def get_f750(wl, fl):
     """
@@ -952,10 +831,12 @@ def make_spt(only_int=False, option='Tr14'):
 
 # -----------------------------------------------------------------------------------
 
-from .execute import get_posterior as get_post
-from .execute import get_posterior_group as get_post_group
+
 
 def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, verbose=False, use_group=False, group=None, group_limit=True):
+
+    from .execute import get_posterior as get_post
+    from .execute import get_posterior_group as get_post_group
     
     y_it = astro.obs_to_y(y)
     if astro.prenoise_training == True:
@@ -1543,9 +1424,10 @@ def calculate_uncertainty(parameter_distr, c, confidence=68, percent=True, x_nam
     else:
         return unc_list
 
-from scipy.spatial.distance import mahalanobis
-from scipy.stats import chi2
+
+
 def get_threshold(confidence, dof):
+    from scipy.stats import chi2
     return chi2.ppf(confidence, dof)
 
 # New MAP calculation based on max log-likelihood. option to change
@@ -1571,6 +1453,7 @@ def find_map_zone(posterior, llike, robust_unc=True, #config=None,
     return arg_map (one value), roi_unc (boolean array)
     
     """
+    from scipy.spatial.distance import mahalanobis
     
     arg_map = np.argmax(llike)
     map_val = posterior[arg_map]
@@ -1836,10 +1719,6 @@ def calculate_map(parameter_distr, c,   x_names=None,
 """
 Useful functions for plotting
 """
-
-import matplotlib.cm as cm
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-import copy
 
 def plot_posterior(posterior, axis, c, x_names = None,
                    x_true=None, plot_true=True, nbin=100, xranges_dic=None, return_xranges_dic=False,
@@ -2732,7 +2611,7 @@ def plot_2d_kde_contour(
 # for MAP or posterior samples
 ############################################################################
 
-from . import HSlabModel
+
 
 def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_norm,
                              distance, distance_err, final_unit):
@@ -2822,6 +2701,8 @@ def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, 
     result : Lbol_post (in log scale)
 
     """
+    from . import HSlabModel
+
     # Setup Monte Carlo varaibles (not in posterior but have 1 sigma error)
     N_mc = len(Av_values)
     # distance, flux
@@ -2919,6 +2800,7 @@ def _init_slab_worker(kwargs):
         _shared_slab_kwargs = dict(kwargs)
 
 def _run_slab(task_row):
+    from . import HSlabModel
     """실제 계산만 수행하는 핵심 함수"""
     T, log_ne, log_tau0, wl = task_row
     # 전역에 저장된 설정값을 사용하여 통신 비용 최소화
@@ -2944,7 +2826,9 @@ def run_multiple_slab_models(wl, Tslab_array, log_ne_array, log_tau0_array, norm
     N_cpu: Number of CPU cores to use for multiprocessing. If None, use all available cores
     
     """
-    
+    from . import HSlabModel
+    import multiprocessing as mp 
+
     n_models = len(Tslab_array)
     if verbose:
         print(f"Run {n_models} slab models with wl grid of {len(wl)} points.")
@@ -2986,8 +2870,6 @@ def run_multiple_slab_models(wl, Tslab_array, log_ne_array, log_tau0_array, norm
 
 
     return results
-
-
 
 
 
@@ -3047,3 +2929,91 @@ def resampspec(wlsamp, wl, fl, err=None):
         return rfl, rerr
     
     return rfl
+
+
+def smoothspec(wl, flux, err=None, R=4000., muse_res_manual=True, verbose=False,  nsig=5.,# constantR=True, modelR=None,
+                    use_numba=False, muse_blue_res=None, muse_red_res=None):
+    """
+    Smoothing spectrum using a gaussian convolution. If kernel size is the same for all spectral bins, simply use gaussian convlution function.
+
+    R = final resolution this has become optional and we use the MUSE table as default    
+    muse_res_manual = True/False use the resolution table provided in the MUSE manual (P110)
+
+    nsig = 5. (number of sigmas for the numerical computation of the gaussian convolution)
+    use_numba  if True, use numba function to speed up: Currently not used
+
+    muse_blue_res=6000, muse_red_res=6000 was used for UV-Net training dataset
+   
+    """
+    import scipy.interpolate as ssi
+    
+    def fgauss(x,s):
+        return np.exp(-x**2/(2.*s**2))
+        
+
+    # These are from the MUSE manual Section 3.2 (P110 version)
+    muse_res_wl = np.array([4650.0,5000.0,5500.0,6000.0,6500.0,7000.0,7500.0,8000.0,8500.0,9000.0,9350.0])
+    muse_res = np.array([1609.,1750.,1978.,2227.,2484.,2737.,2975.,3183.,3350.,3465.,3506.])
+
+    # artificially add higher resolution at the start
+    if muse_blue_res is not None:
+        muse_res_wl = np.insert(muse_res_wl, 0, 4600)
+        muse_res = np.insert(muse_res, 0, muse_blue_res)
+    # artificially add higher resolution at the end
+    if muse_red_res is not None:
+        muse_res_wl = np.append(muse_res_wl, [9400])
+        muse_res = np.append(muse_res, [muse_red_res])
+
+    nbin = len(flux)
+    ssfl = np.zeros(nbin)
+    dl = wl / R
+
+    smooth_err = False
+    if err is not None:
+        if len(err)==nbin:
+            smooth_err = True
+            sser = np.zeros(nbin)
+        else:
+            sys.exit("len(err)!=len(flux)")
+
+    if muse_res_manual:
+        if verbose: print("Using MUSE-res-manual ({0}, {1}) => ".format(dl[0],dl[-1]))
+        muse_res_interp = ssi.interp1d(muse_res_wl,muse_res)
+        
+        nlow = (wl<=muse_res_wl[0])
+        dl[nlow] = wl[nlow]/muse_res[0]
+        nhigh = (wl>=muse_res_wl[-1])
+        dl[nhigh] = wl[nhigh]/muse_res[-1]
+        ninterp = (wl>muse_res_wl[0]) & (wl<muse_res_wl[-1])
+        dl[ninterp] = wl[ninterp]/muse_res_interp(wl[ninterp])
+        if verbose: print(" ({0}, {1})\n".format(dl[0], dl[-1]))
+
+    if use_numba:
+        # ssfl = _smoothspec_numba_core(wl, self.asfl, dl, nsig)
+        pass
+    else:
+        sdl = dl / (2. * np.sqrt(2. * np.log(2.)))
+
+        for i in range(nbin):
+            msdl = wl[i]-nsig*sdl[i]
+            psdl = wl[i]+nsig*sdl[i]
+            nsm = np.where((wl >= msdl) & (wl<=psdl))
+            smwl = wl[nsm]
+            fs = 0.
+            area = 0.
+            if smooth_err: # also do error smoothing. error should be the same unit as flux
+                es = 0
+            for j in range(len(smwl)):
+                fg = fgauss(smwl[j]-wl[i],sdl[i])
+                fs += fg*flux[nsm[0][j]]
+                area += fg
+                if smooth_err:
+                    es += (fg * err[nsm[0][j]] )**2
+            ssfl[i] = fs/area
+            if smooth_err:
+                sser[i] = np.sqrt( es/(area*area) )
+
+    if smooth_err:
+        return (ssfl, sser)
+    else:
+        return ssfl
