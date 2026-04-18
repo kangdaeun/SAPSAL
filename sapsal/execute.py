@@ -12,7 +12,7 @@ from torch.nn.functional import binary_cross_entropy_with_logits
 # from torch.nn.functional import avg_pool2d, interpolate
 # from torch.autograd import Variable
 import numpy as np
-import tqdm
+
 import gc
 # import matplotlib
 # import matplotlib.pyplot
@@ -196,6 +196,8 @@ Modified train_network (2022.08.30)
 """
 
 def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c is cINNConfig class variable
+
+    import tqdm
 
     t_start = time()
     
@@ -1039,6 +1041,7 @@ def train_network(c, data=None, verbose=True, max_epoch=1000, resume=False): # c
 
 
 def train_network_DAwoD(c, data=None, verbose=True, max_epoch=1000): # c is cINNConfig class variable
+    import tqdm
 
     t_start = time()
     
@@ -1584,6 +1587,7 @@ def train_network_DAwoD(c, data=None, verbose=True, max_epoch=1000): # c is cINN
     
 # Deprecated
 def train_prenoise_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNConfig class variable
+    import tqdm
 
     t_start = time()
     
@@ -1931,7 +1935,8 @@ Training code for SimGap network : FTransformNet
 """
 def train_ftrans_network(c, feature_test=None, feature_train=None, 
                   verbose=True, max_epoch=200, return_model=False, return_training_status=False):
-   
+    import tqdm
+
     t_start = time()
     
     from .tools import simgap_tools
@@ -2199,7 +2204,8 @@ def train_ftrans_network(c, feature_test=None, feature_train=None,
 Train Normal-Net with flag
 """
 def train_flag_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNConfig class variable
-
+    import tqdm
+    
     t_start = time()
     
     # print all parameters in the config
@@ -2553,7 +2559,7 @@ Train normal net with wavelength coupling
 """
 
 def train_wc_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNConfig class variable
-
+    import tqdm
     t_start = time()
 
     # print all parameters in the config
