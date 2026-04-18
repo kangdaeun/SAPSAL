@@ -3153,7 +3153,7 @@ def train_noisy_network(c): # c is cINNConfig class variable
 """
 
 
-def get_posterior(y_it, c, N=4096, return_llike=False, verbose=False):
+def get_posterior(y_it, c, N=4096, return_llike=False, seed=0, verbose=False):
     
     # import torch
     if c.network_model is None:
@@ -3191,6 +3191,7 @@ def get_posterior(y_it, c, N=4096, return_llike=False, verbose=False):
     
     # y_it = torch.Tensor(y_it).reshape(-1, c.y_dim_in) # Make 2D torch Tensor even if you gave only 1D tensor (1, c.y_dim_in)
     
+    torch.manual_seed(seed)
     
     outputs = []
     
@@ -3234,7 +3235,7 @@ def get_posterior(y_it, c, N=4096, return_llike=False, verbose=False):
     else:
         return np.array(outputs)
     
-def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, group_limit=True, verbose=False):
+def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, group_limit=True, seed=0, verbose=False):
     
     # import torch
     if c.network_model is None:
@@ -3266,6 +3267,8 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, group_l
         if y_it.ndim==1: # if  input is just one observation. Make it to 2D tensor
             y_it = y_it[None,:] 
         n_samp = y_it.shape[0]
+
+    torch.manual_seed(seed)
     
     # if return_llike = True, it will calculate llike and return both outputs and llike
     # Or you can calculate llike separately by using get_loglikelihood function

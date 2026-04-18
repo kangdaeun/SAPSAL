@@ -833,7 +833,7 @@ def make_spt(only_int=False, option='Tr14'):
 
 
 
-def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, verbose=False, use_group=False, group=None, group_limit=True):
+def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, verbose=False, use_group=False, group=None, group_limit=True, seed=0):
 
     from .execute import get_posterior as get_post
     from .execute import get_posterior_group as get_post_group
@@ -886,9 +886,9 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, ver
             
     
     if use_group:
-        output = get_post_group(y_it, astro, N=N, group=group, return_llike=return_llike, group_limit=group_limit, verbose=verbose)
+        output = get_post_group(y_it, astro, N=N, group=group, return_llike=return_llike, group_limit=group_limit, seed=seed, verbose=verbose)
     else:
-        output = get_post(y_it, astro, N=N, return_llike=return_llike, verbose=verbose)
+        output = get_post(y_it, astro, N=N, return_llike=return_llike, seed=seed, verbose=verbose)
     if return_llike:
         x = astro.x_to_params(output[0])
         return x, output[1]
@@ -1432,13 +1432,12 @@ def get_threshold(confidence, dof):
 
 # New MAP calculation based on max log-likelihood. option to change
 def find_map_zone(posterior, llike, robust_unc=True, #config=None, 
-                    weighted_medoid=False, 
-                    f_wmd=0.05, # fraction of samples in the high rank zone for weighted medoid.
-                    robust_map=True, confidence_map=0.95, # robust_map mode, when using argmax 
+                    weighted_medoid=False, f_wmd=0.05, # fraction of samples in the high rank zone for weighted medoid.
+                    robust_map=True, confidence_map=0.68, # robust_map mode, when using argmax 
                     confidence_unc=0.95, # robust_err mode 
-                    f_unc=0.15, # fraction of samples in the uncertainty region
-                    # n_sig_threshold = 2.0, # threshold for the first filtering of uncertainty region (in log-likelihood unit). default is 2.0, which corresponds to 2-sigma
-                    # min_sample_fraction=0.01, # minimum fraction of samples in the uncertainty region (to avoid too small sample size for robust_unc)
+                    # f_unc=0.15, # fraction of samples in the uncertainty region
+                    n_sig_threshold = 2.0, # threshold for the first filtering of uncertainty region (in log-likelihood unit). default is 2.0, which corresponds to 2-sigma
+                    min_uncsample_fraction=0.01, # minimum fraction of samples in the uncertainty region (to avoid too small sample size for robust_unc)
                     # n_sig_wmd = 1.0, 
                     # min_sample_wmd = None,
                     verbose=False):
@@ -1460,17 +1459,19 @@ def find_map_zone(posterior, llike, robust_unc=True, #config=None,
     x_dim = posterior.shape[1]
     N_post = posterior.shape[0]
 
-    # threshold = (n_sig_threshold**2)/2.0 # in log-likelihood unit, 2-sigma corresponds to 4.
+
+    threshold = (n_sig_threshold**2)/2.0 # in log-likelihood unit, 2-sigma corresponds to 4.
 
     # Find error calculating region
-    # roi_unc = llike > np.max(llike) - threshold
-    # if np.sum(roi_unc) < min_sample_fraction*len(posterior):
-    #     if verbose:
-    #         print(f"Warning: The number of samples in the uncertainty region is less than {min_sample_fraction*100:.1f}% of total samples. Increase the sigma threshold from {n_sig_threshold:g} to {n_sig_threshold+0.5:g}.")
-    #     n_sig_threshold += 0.5
-    #     threshold = (n_sig_threshold**2)/2.0 
-    #     roi_unc = llike > np.max(llike) - threshold # increase threshold to include more samples
-    roi_unc = llike > np.sort(llike)[::-1][int(f_unc*N_post)] # use fraction of samples to determine the uncertainty region. This is more robust than using a fixed log-likelihood threshold, which may not correspond to the same number of samples in different cases.
+    roi_unc = llike > np.max(llike) - threshold
+    sig_step = 0.1
+    while np.sum(roi_unc) < min_uncsample_fraction*N_post and n_sig_threshold < 3.1:
+        if verbose:
+            print(f"Warning: The number of samples in the uncertainty region is less than {min_uncsample_fraction*100:.1f}% of total samples. Increase the sigma threshold from {n_sig_threshold:g} to {n_sig_threshold+sig_step:g}.")
+        n_sig_threshold += sig_step
+        threshold = (n_sig_threshold**2)/2.0 
+        roi_unc = llike > np.max(llike) - threshold # increase threshold to include more samples
+    # roi_unc = llike > np.sort(llike)[::-1][int(f_unc*N_post)] # use fraction of samples to determine the uncertainty region. This is more robust than using a fixed log-likelihood threshold, which may not correspond to the same number of samples in different cases.
 
     if weighted_medoid:
         # if min_sample_wmd is None:
@@ -1514,9 +1515,9 @@ def find_map_zone(posterior, llike, robust_unc=True, #config=None,
             inv_cov = np.linalg.inv( np.cov(post_unc.T, aweights=weights) )
             mhl = mahalanobis(map_val, avg_val, inv_cov)
             thre = get_threshold(confidence_map, x_dim)
-            if mhl**2 >= thre or weighted_medoid:
+            if mhl**2 >= thre:
                 # find alternative MAP
-                if verbose and (mhl**2 >= thre):
+                if verbose:
                     print(f"MAP point is outside the {confidence_map*100:.1f}% confidence region. Finding alternative MAP point...")
                 mhl_smps = np.zeros(len(post_unc))
                 for j, p in enumerate(post_unc):
