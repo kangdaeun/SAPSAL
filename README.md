@@ -29,12 +29,12 @@ The following packages are required to run the scripts in this repository:
 | astropy | >= 5.3.4 |
 | matplotlib | >= 3.8.0 |
 | scipy | >= 1.11.4 |
-| tqdm | >= 4.65.0 |
 | **Recommended** |
 | numba | >= 0.59.0 | Used in hydrogen slab codes (HSlabModel.py). NEEDED when using resimulation for SAPSAL-v3s |
 | localreg | >= 0.5.0 | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://https://github.com/sigvaldm/localreg) |
 | ray | >= 2.44.0  | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://docs.ray.io/en/latest/index.html#) ray[default] is enough|
 | **Optional** |
+| tqdm | >= 4.65.0 | Only required when you train a new network using functions in execute.py |
 | GPUtil | >= 1.4.0 | for automatic CUDA GPU search and selection <br> (find_gpu_available function in expander.py), <br> Get [here](https://github.com/anderskm/gputil) |
 | KDEpy | >= 1.1.9 | for 1D MAP calcuation <br> (calculate_map function in expander.py), <br> get [here](https://kdepy.readthedocs.io/en/latest/index.html) |
 | scikit-learn | >= 1.2.2 | (NOT used for trained network) |
