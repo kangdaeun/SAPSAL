@@ -833,26 +833,38 @@ def make_spt(only_int=False, option='Tr14'):
 
 
 
-def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, verbose=False, use_group=False, group=None, group_limit=True, seed=0):
+def get_posterior(y, config, N=4096, unc=None, flag=None, return_llike=False, verbose=False, use_group=False, group=None, group_limit=True, seed=0):
 
     from .execute import get_posterior as get_post
     from .execute import get_posterior_group as get_post_group
     
-    y_it = astro.obs_to_y(y)
-    if astro.prenoise_training == True:
+    # check dimension: one obs or multiple obs
+    y = np.atleast_2d(y)
+    N_obs = y.shape[0]
+    if unc is not None:
+        unc = np.atleast_2d(unc)
+        if unc.shape[0] != N_obs:
+            raise ValueError("Number of observations in unc does not match y.")
+    if flag is not None:
+        flag = np.atleast_2d(flag)
+        if flag.shape[0] != N_obs:
+            raise ValueError("Number of observations in flag does not match y.")    
+
+    y_it = config.obs_to_y(y)
+    if config.prenoise_training == True:
         if unc.shape == y.shape:
-            sig = astro.unc_to_sig(unc)
+            sig = config.unc_to_sig(unc)
             y_it = np.hstack((y_it, sig))
     
     
-    if astro.cond_net_code=="hybrid_cnn" or astro.cond_net_code=="hybrid_stack": # feature should be tuple
+    if config.cond_net_code=="hybrid_cnn" or config.cond_net_code=="hybrid_stack": # feature should be tuple
         # Need to divide spec_data (for cnn) and global_data (for global_net)
-        roi_spec = get_spec_index(astro.y_names, get_loc=True, use_bool=True)
+        roi_spec = get_spec_index(config.y_names, get_loc=True, use_bool=True)
         if np.sum(roi_spec)==0:
-            roi_spec = get_flux_loc(astro.y_names, use_bool=True)
-        if astro.prenoise_training==True:
+            roi_spec = get_flux_loc(config.y_names, use_bool=True)
+        if config.prenoise_training==True:
             # divide y and sigma in axis=1
-            y_3d = y_it.reshape(-1, 2, len(astro.y_names)) 
+            y_3d = y_it.reshape(-1, 2, len(config.y_names)) 
             spec_data = y_3d[:, :, roi_spec] # (Models, channel, spectral points)
             global_data = y_3d[:, :, np.invert(roi_spec)].reshape(y_3d.shape[0], -1) # (Models, global params, including their noises)
         else:
@@ -861,8 +873,8 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, ver
         
         y_it = (spec_data, global_data)
     
-    # if astro.use_flag == True:
-    #     if flag.shape[-1] == len(astro.flag_names):
+    # if config.use_flag == True:
+    #     if flag.shape[-1] == len(config.flag_names):
     #         if len(flag.shape)==1:
     #             flag2d = flag.reshape(1,-1)
     #             y2d = y_it.reshape(1,-1)
@@ -870,30 +882,30 @@ def get_posterior(y, astro, N=4096, unc=None, flag=None, return_llike=False, ver
     #             flag2d = flag
     #             y2d = y_it
 
-    #         for i_flag, flag_name in enumerate(astro.flag_names):
+    #         for i_flag, flag_name in enumerate(config.flag_names):
     #             roi_off = flag2d[:, i_flag] == 0.0
-    #             y2d[roi_off][:,astro.flag_index_dic[flag_name]] = 0.0
+    #             y2d[roi_off][:,config.flag_index_dic[flag_name]] = 0.0
 
-    #         rf = astro.flag_to_rf(flag2d)
+    #         rf = config.flag_to_rf(flag2d)
     #         y_it = np.hstack((y2d, rf))
 
-    # if astro.wavelength_coupling == True:
-    #     wl = get_coupling_wavelength(astro.y_names)
+    # if config.wavelength_coupling == True:
+    #     wl = get_coupling_wavelength(config.y_names)
     #     if len(y.shape)>1: 
     #         wl = np.repeat(wl.reshape(1,-1), y.shape[0], axis=0)
-    #     y_it = np.hstack( (y_it, astro.wl_to_lambda(wl)))
+    #     y_it = np.hstack( (y_it, config.wl_to_lambda(wl)))
 
             
     
     if use_group:
-        output = get_post_group(y_it, astro, N=N, group=group, return_llike=return_llike, group_limit=group_limit, seed=seed, verbose=verbose)
+        output = get_post_group(y_it, config, N=N, group=group, return_llike=return_llike, group_limit=group_limit, seed=seed, verbose=verbose)
     else:
-        output = get_post(y_it, astro, N=N, return_llike=return_llike, seed=seed, verbose=verbose)
+        output = get_post(y_it, config, N=N, return_llike=return_llike, seed=seed, verbose=verbose)
     if return_llike:
-        x = astro.x_to_params(output[0])
+        x = config.x_to_params(output[0])
         return x, output[1]
     else:
-        return astro.x_to_params(output)
+        return config.x_to_params(output)
     
 
 MIN_FREE_MEMORY_MIB = None  # Minimum available VRAM in MiB. 
