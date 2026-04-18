@@ -624,11 +624,14 @@ class cINNConfig():
         print("==================== cINN NETWORK SETTING =================")
         if self.config_file is not None:
             print("cINN_config file:", os.path.basename(self.config_file))
-        print("database:", os.path.basename(self.tablename))
+        if self.tablename is not None:
+            print("database:", os.path.basename(self.tablename))
         # print("DB expander:", os.path.basename(self.expander))
         print("# of parameters:", self.x_dim)
         print("# of observables:", self.y_dim_in)
         print("device:",self.device)
+        if self.prenoise_training:
+            print("Network in Noise-Net mode")
         print("===========================================================") 
         
     def import_expander(self): # expander가 cINN_set으로 들어가면, 그리고 고정으로 결정되면 이 부분도 간단하게 바뀔 것. 

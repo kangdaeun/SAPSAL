@@ -19,21 +19,19 @@ ess_files/test_classIII_stars.py
 ess_files/feature_importance.py 
 ess_files/train_ftnet.py 
 
-# networks/SpD_TGARL_Noise_mMUSE/SpD_TGARL_Noise_mMUSE.pt
-# networks/SpD_TGARL_Noise_mMUSE/__pycache__/
-# networks/Stl_TGA_tpl/Stl_TGA_tpl.pt
-networks/v1_settl/v1_Settl_Net.pt
-networks/v2_k25/v2_K25_Net.pt
-# networks/v2_k25/SpD_TGARL_Noise_mMUSE.pt.zip 
-# networks/v1_settl/Stl_TGA_tpl.pt.zip 
 
+# sapsal/FRAPPE/
+# sapsal/data/
+sapsal/networks/v1_settl/v1_Settl_Net.pt
+sapsal/networks/v2_k25/v2_K25_Net.pt
+sapsal/networks/v3_uv/v3_UV_Net.pt
+sapsal/networks/v3_vis/v3_Vis_Net.pt
 
-sapsal/FRAPPE/
-sapsal/data/
 
 
 # macOS 시스템 파일
 .DS_Store
+__MACOSX/
 
 # Python 관련
 __pycache__/
