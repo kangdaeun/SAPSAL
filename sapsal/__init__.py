@@ -13,11 +13,11 @@ from . import tools
 from . import expander
 from . import resim
 from . import HSlabModel
-
+from . import io
 # for convinience
 from .cINN_config import read_config_from_file
 from .data_loader import DataLoader
 
 __all__ = ["models", "FrEIA", "tools", "expander", "resim", "HslabModel",
-			"read_config_from_file", "DataLoader",
+			"read_config_from_file", "DataLoader", "io",
 			]
