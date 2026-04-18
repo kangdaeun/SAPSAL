@@ -55,7 +55,7 @@ prenoise_training = False
 """
  Training hyperparameters 
 """
-device = 'cuda'
+device = 'cpu'
 # device: cpu, cuda, cuda:0 (modifiable anytime after you read config)
 batch_size = 512
 n_epochs = 286
