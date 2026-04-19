@@ -2205,7 +2205,7 @@ Train Normal-Net with flag
 """
 def train_flag_network(c, data=None, verbose=True, max_epoch=1000): # c is cINNConfig class variable
     import tqdm
-    
+
     t_start = time()
     
     # print all parameters in the config
@@ -3282,13 +3282,13 @@ def get_posterior_group(y_it, c, N=4096, group=None, return_llike=False, group_l
         llikes = []
         
     # g_max = int(1e8/(c.x_dim*2+c.y_dim_in)/N)
-    if group_limit:
-        g_max = int(4e6/N)
-        if g_max < 1: g_max = 10
-        if group is None:
-            group = g_max
-        elif group > g_max:
-            group = g_max
+    # if group_limit:
+    #     g_max = int(4e6/N)
+    #     if g_max < 1: g_max = 10
+    #     if group is None:
+    #         group = g_max
+    #     elif group > g_max:
+    #         group = g_max
         
     n_group = n_samp//group
     if n_samp%group > 0:

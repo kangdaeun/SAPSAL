@@ -1770,6 +1770,7 @@ def plot_posterior(posterior, axis, c, x_names = None,
         param_names = c.x_names.copy()
         
     n_param = len(param_names)
+    axis = axis.ravel()
     
     # check dimension 
     if posterior.shape[1] != n_param:
