@@ -52,7 +52,7 @@ NETWORK_FILES = {
 # 한 함수내에 경로를 얻고 네트워크를 로드해서 config만 전달하는 편이 나을까?
 # 일단 별도 함수로
 
-def load_pretrained_network(net_code, remove_table_paths=True, verbose=False):
+def load_pretrained_network(net_code, remove_table_paths=True, verbose=True):
     # make path for config
     config_rel_path = CONFIG_FILES.get(net_code, None)
     if config_rel_path is None:

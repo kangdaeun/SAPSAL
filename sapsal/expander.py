@@ -50,8 +50,11 @@ def get_flux_loc(y_names, use_bool=False):
         return flux_loc
     
 def get_wl_used(y_names):
-    return np.array([float(y_names[k][1:]) for k in get_flux_loc(y_names)])
-
+    if len(get_spec_index(y_names))==0: # only for flux networks
+        return np.array([float(y_names[k][1:]) for k in get_flux_loc(y_names)])
+    else: 
+        return None
+    
 def get_spec_names_for_flux(y_names, wl, dwl=10):
    
     def is_float(s):
