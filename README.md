@@ -4,13 +4,14 @@
 
 # SAPSAL
 
-**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young pre-main sequence stars (M-F types) from their optical spectra using conditional invertible neural networks (cINNs). The neural networks are first designed targeting VLT/MUSE data but it is applicable to other instruments as well. 
+**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young pre-main sequence stars (M-F types) from their optical spectra. The overall SAPSAL project aims to develop a deep learning tool for analyzing numerous stellar spectra observed by VLT/MUSE (4750 - 9350Å), but from SAPSAL-v3 networks, the usage is not limited to VLT/MUSE data.
+
+The networks are built on the conditional invertible neural networks (cINNs) architecture, which enables to get a full posterior distribution of the parameters, not just a single prediction.
 
 SAPSAL is named after a Korean dog breed, the SAPSAL dog.
 
-SAPSAL networks give a full posterior distribution of stellar parameters (e.g. $$T_{\rm{eff}}$$, $$\rm{log} g$$,  $$A_{\rm{V}}$$,  $$r_{\rm{veil}}$$) from MUSE spectrum (4750 - 9350Å)
 
-This repository provides Python codes to build and run the SAPSAL networks introduced in the following papers:
+This repository provides Python code to build and run the SAPSAL networks introduced in the following papers:
 - [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html)
 - [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html)
 - Kang et al. 2026, _in prep._
@@ -32,7 +33,7 @@ The following packages are required to run the scripts in this repository:
 | **Recommended** |
 | numba | >= 0.59.0 | Used in hydrogen slab codes (HSlabModel.py). NEEDED when using resimulation for SAPSAL-v3s |
 | localreg | >= 0.5.0 | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://https://github.com/sigvaldm/localreg) |
-| ray | >= 2.44.0  | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://docs.ray.io/en/latest/index.html#) ray[default] is enough|
+| ray | >= 2.44.0  | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://docs.ray.io/en/latest/index.html#)   <br> ray[default] is enough|
 | **Optional** |
 | tqdm | >= 4.65.0 | Only required when you train a new network using functions in execute.py |
 | GPUtil | >= 1.4.0 | for automatic CUDA GPU search and selection <br> (find_gpu_available function in expander.py), <br> Get [here](https://github.com/anderskm/gputil) |
@@ -47,10 +48,10 @@ The following packages are required to run the scripts in this repository:
 
 
 
-
 ## How to use pre-trained networks
 
-You can download pre-trained networks in networks/. Currently (2025. 06), there are two networks available.
+Once you have cloned the SAPSAL repository, you can load and use the pre-trained networks. 
+Below is the list of available SAPSAL networks (2026. 4. 20).
 
 
 | Network name | Short name | Codename | Parameters to predict | Source | 
@@ -67,18 +68,34 @@ You can download pre-trained networks in networks/. Currently (2025. 06), there 
 | SpD_TGARL_Noise_mMUSE  |  Teff, log g, Av, r_veil, library flag  | cINN presented in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) <br>Trained on BT-Settl and Dusty<br>Trained on fixed Rv value of 4.4|
 
 **SpD_TGARL_Noise_mMUSE** is the recent version used to analyse stars in Trumpler 14. It considers the flux errors in the prediction process (i.e., Noise-Net mode). This network requires MUSE spectrum and medium flux error ($$\sigma_{\rm{med}}$$ = N/S ratio) along the wavelength. More details about the networks are in [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html).
--->
 
 In each network directory, you will find a configuration file (config_XXXX.py) and a zipped network (XXXX.pt.zip). First, unzip the network to get the network file (XXXX.pt). Please keep the configuration file and network file in the same directory (this is not necessary, but it makes reading the network a bit easier).
+-->
 
-You can find the jupyter notebook (Tutorial.ipynb) in examples/, which explains
+You can load the network using the corresponding network code (codename in the above table).
+```python
+import sapsal
+print("Network codes available:", sapsal.io.AVAILABLE_NET_CODES)
+config = sapsal.io.load_pretrained_network('v3_vis', verbose=True)
+```
+
+For more detailed instructions for loading and using the network, see Tutorial.ipynb in examples/.
+This explains:
 - how to read the network
 - how to prepare input data from your observations
 - how to run the network and make predictions
 - how to use useful functions in expander.py to calculate MAP estimates, plot posterior distributions, etc.
 
+### Flux points needed for SAPSAL-v3s
+| Network name | Wavelength (Å)
+|---------|---------|
+| Vis-Net | 4770, 5125, 5415, 6010, 6255, 6447.5, 6630, 6825,   <br>  7030, 7070, 7100, 7140, 7200, 7400, 7500, 7560, <br> 7975, 8100, 8575, 8630, 8710 |
+| UV-Net | 3400, 3550, 3605, 4005, 4145, 4650, <br> 4750, 5125, 5415, 6255, 6447.5, 6630, 6825, <br> 7030, 7070, 7100, 7140, 7200, 7400, 7500, 7560,  <br> 7975, 8100, 8575, 8630, 8710 |
+
+
 ### MUSE wavelength
-Networks are designed for the VLT/MUSE spectrum. We masked some spectral bins in the network to avoid emission lines, but used most of the spectral bins. You can find out how to filter out unnecessary spectral bins in Tutorial.ipynb.
+SAPSAL-v1 and -v2 networks are designed for the VLT/MUSE spectrum with specific resolution (R~4000) and bin size. We masked some spectral bins in the network to avoid emission lines, but used most of the spectral bins. 
+<!-- You can find out how to filter out unnecessary spectral bins in Tutorial.ipynb. -->
 
 MUSE wavelength for the whole range:
 > np.arange(4750.1572265625, 9351.4072265625, 1.25)
