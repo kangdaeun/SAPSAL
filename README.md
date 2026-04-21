@@ -56,10 +56,10 @@ Below is the list of available SAPSAL networks (2026. 4. 20).
 
 | Network name | Short name | Codename | Parameters to predict | Source | 
 |---------|---------|---------|---------|---------|
-| SAPSAL-v1-Settl | Settl-Net | v1_Settl | 3 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$ | [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) |
-| SAPSAL-v2-K25   | K25-Net   | v2_K25   | 4 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$r_{\rm{veil}}$$, library flag | [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) |
-| SAPSAL-v3-Vis   | Vis-Net   | v3_Vis   | 9 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$\rm{log} r_{\rm{veil}}$$, library flag, slab parameters ($$T_{\rm{slab}}$$, $$\rm{log} n_{\rm{e}}$$, $$\rm{log} \tau_{0}$$, $$\rm{log} F_{\rm{slab,norm}}$$) | Kang et al. 2026, _in prep._ | 
-| SAPSAL-v3-UV    | UV-Net    | v3_UV    | 9 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$\rm{log} r_{\rm{veil}}$$, library flag, slab parameters ($$T_{\rm{slab}}$$, $$\rm{log} n_{\rm{e}}$$, $$\rm{log} \tau_{0}$$, $$\rm{log} F_{\rm{slab,norm}}$$) | Kang et al. 2026, _in prep._ | 
+| SAPSAL-v1-Settl | Settl-Net | v1_settl | 3 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$ | [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html) |
+| SAPSAL-v2-K25   | K25-Net   | v2_k25   | 4 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$r_{\rm{veil}}$$, library flag | [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html) |
+| SAPSAL-v3-Vis   | Vis-Net   | v3_vis   | 9 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$\rm{log} r_{\rm{veil}}$$, library flag, slab parameters ($$T_{\rm{slab}}$$, $$\rm{log} n_{\rm{e}}$$, $$\rm{log} \tau_{0}$$, $$\rm{log} F_{\rm{slab,norm}}$$) | Kang et al. 2026, _in prep._ | 
+| SAPSAL-v3-UV    | UV-Net    | v3_uv    | 9 params: $$\rm{log} T_{\rm{eff}}$$, $$\rm{log} g$$, $$A_{\rm{V}}$$, $$\rm{log} r_{\rm{veil}}$$, library flag, slab parameters ($$T_{\rm{slab}}$$, $$\rm{log} n_{\rm{e}}$$, $$\rm{log} \tau_{0}$$, $$\rm{log} F_{\rm{slab,norm}}$$) | Kang et al. 2026, _in prep._ | 
 
 <!--
 | Network name | Parameters to predict | Comments |
