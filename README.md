@@ -6,7 +6,7 @@
 
 **SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young pre-main sequence stars (M-F types) from their optical spectra. The overall SAPSAL project aims to develop a deep learning tool for analyzing numerous stellar spectra observed by VLT/MUSE (4750 - 9350Å), but from SAPSAL-v3 networks, the usage is not limited to VLT/MUSE data.
 
-The networks are built on the conditional invertible neural networks (cINNs) architecture, which enables getting a full posterior distribution of the parameters, not just a single prediction.
+The networks are built on the conditional invertible neural network (cINN) architecture, which enables getting a full posterior distribution of the parameters, not just a single prediction.
 
 SAPSAL is named after a Korean dog breed, the SAPSAL dog.
 
@@ -131,10 +131,11 @@ This project is licensed under the **MIT License**.
     * **Note:** This project includes a modified version based on FrEIA v0.2. It has been customized for this specific implementation and may differ from the latest upstream version. (See [Installation requirements](#installation-requirements) for details).
  
 * **FRAPPE** ([https://github.com/RikClaes/FRAPPE](https://github.com/RikClaes/FRAPPE)):
-    * This project incorporates components from the FRAPPE for the resimulation pipeline (specifically for Vis-Net and UV-Net).
+    * Licensed under the MIT License.
+    * SAPSAL incorporates components from FRAPPE for the resimulation pipeline (specifically for Vis-Net and UV-Net).
     * To ensure compatibility with our trained models, we provide a frozen version based on FRAPPE v0.1 ([https://github.com/RikClaes/FRAPPE_ClassIII_interpolations](https://github.com/RikClaes/FRAPPE_ClassIII_interpolations))
     * **Note on Modifications:** We have included minor modifications (with 1-2 lines) to ensure seamless integration with the SAPSAL environment. 
-    * **Credit:s** All rights to the original logic belong to the original author(s). Please cite the original FRAPPE repositories and [Claes et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...690A.122C/abstract) if you use the resimulation functions for Vis-Net or UV-Net.
+    * **Credits:** All rights to the original logic belong to the original author(s). Please cite [Claes et al. 2024](https://ui.adsabs.harvard.edu/abs/2024A%26A...690A.122C/abstract) if you use the resimulation functions for Vis-Net or UV-Net.
 
 <!--
 * **Note:** The original code did not have a specific license file at the time of integration (2026.02.09). We have included a slightly modified version (with 1-2 lines of minor modifications). 
