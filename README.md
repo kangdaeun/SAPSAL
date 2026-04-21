@@ -32,7 +32,7 @@ The following packages are required to run the scripts in this repository:
 | scipy | >= 1.11.4 |
 | **Recommended** |
 | numba | >= 0.59.0 | Used in hydrogen slab codes (HSlabModel.py). NEEDED when using resimulation for SAPSAL-v3s |
-| localreg | >= 0.5.0 | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://https://github.com/sigvaldm/localreg) |
+| localreg | >= 0.5.0 | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://github.com/sigvaldm/localreg) |
 | ray | >= 2.44.0  | Used in FRAPPE. NEEDED when using resimulation for SAPSAL-v3s, <br> get [here](https://docs.ray.io/en/latest/index.html#)   <br> ray[default] is enough|
 | **Optional** |
 | tqdm | >= 4.65.0 | Only required when you train a new network using functions in execute.py |
