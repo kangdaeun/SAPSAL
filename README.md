@@ -4,7 +4,7 @@
 
 # SAPSAL
 
-**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young pre-main sequence stars (M-F types) from their optical spectra. The overall SAPSAL project aims to develop a deep learning tool for analyzing numerous stellar spectra observed by VLT/MUSE (4750 - 9350Å), but from SAPSAL-v3 networks, the usage is not limited to VLT/MUSE data.
+**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young stars (M-F types) from their optical spectra. The overall SAPSAL project aims to develop a deep learning tool for analyzing numerous stellar spectra observed by VLT/MUSE (4750 - 9350Å), but from SAPSAL-v3 networks, the usage is not limited to VLT/MUSE data.
 
 The networks are built on the conditional invertible neural network (cINN) architecture, which enables getting a full posterior distribution of the parameters, not just a single prediction.
 
