@@ -1477,10 +1477,10 @@ def find_map_zone(posterior, llike, robust_unc=True, #config=None,
 
     threshold = (n_sig_threshold**2)/2.0 # in log-likelihood unit, 2-sigma corresponds to 4.
 
-    # Find error calculating region
+    # Find High Probability zone (HPZ) 
     roi_unc = llike > np.max(llike) - threshold
     sig_step = 0.1
-    while np.sum(roi_unc) < min_uncsample_fraction*N_post and n_sig_threshold < 3.1:
+    while np.sum(roi_unc) < min_uncsample_fraction*N_post and n_sig_threshold < 3.0:
         if verbose:
             print(f"Warning: The number of samples in the uncertainty region is less than {min_uncsample_fraction*100:.1f}% of total samples. Increase the sigma threshold from {n_sig_threshold:g} to {n_sig_threshold+sig_step:g}.")
         n_sig_threshold += sig_step
@@ -1741,7 +1741,7 @@ def plot_posterior(posterior, axis, c, x_names = None,
                     color_post = 'gray', alpha=0.4, text_true=True,
                      map_values=None, plot_map=True, color_map='orange', text_map=True, 
                      u68_values = None, calculate_u68=True,  text_u68=True, additional_text=None,
-                     text_label_true=r'$X^{\mathrm{True}}$', text_label_map=r'$X^{\mathrm{MAP}}$',
+                     text_label_true=r'$X^{\mathrm{True}}$', text_label_map=r'$X^{\mathrm{MAP}}$', text_label_u68=r"$u_{68}$",
                      ylabelsize='medium', ylabel='Probability density', xlabelsize='large', 
                      yticklabelsize='medium',xticklabelsize='large',
                      txtsize='small', title_unit=True,
@@ -1896,7 +1896,7 @@ def plot_posterior(posterior, axis, c, x_names = None,
                 txt.append('(%.5g [K])'%10**x_map)
             
         if text_u68:
-            txt.append('$u_{68}$=%#.4g'%(u68))
+            txt.append("%s=%#.4g"%(text_label_u68, u68))
             if param=='logTeff' and len(u68_values)==(n_param+1):
                 txt.append('(%.5g [K])'%( u68_values[-1]))
                 
@@ -2686,6 +2686,7 @@ def calculate_Lacc_post(wl, y_obs, y_err, Av_values, Rv_values, r_values, Fslab_
 
 def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, bc7500=0, wl0=7500, n_bins=3,
                         y_err=None, distance_err=None, final_unit=1, 
+                        return_only_phot = False,
                         use_Hslab_veiling=False, use_one_Hslab_model=False, Tslab_values=None, logne_values=None, logtau0_values=None,
                         slab_kwargs={"wl_sp": 7500, "Zi":1, "wl_sp_unit":units.AA, "include_Hn":True, "Int_lam":True, "lam_unit":units.AA}
                         ):
@@ -2707,6 +2708,7 @@ def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, 
     # fslab_norm : 2D array of normalized slab spectra for each posterior, which will be used to remove veiling (N_post, wl) 
     bc7500 : bolometric correction at 7500A : BC7500 is defined as log10( Fbol/F7500). Default = 0
 
+    return_only_phot : if True, return only dereddened and deveiled photometric spectrum without applying BC, etc. (retun 2D array of shape (N_post, wl))
     distance : distance to target. unit should be applied to final unit
     distance_err : distance error (same unit as distance) (or None)
     final_unit : final unit for Lbol (linear) : usually it is kpc*kpc/Lsun in cgs. Default = 1
@@ -2757,8 +2759,10 @@ def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, 
         fslab_norm=None
 
     y_phot, veiling = remove_veil(wl, y_drd, r_values, fslab_norm = fslab_norm, return_veil=True)
+    if return_only_phot:
+        return y_phot
+    
     f750 = get_flux_at(wl, y_phot, target_wl=wl0, n_bins=n_bins) # f750 for MC/posterior cases (from dereddend)
-
 
     # use bc
     Fbol_post = 10**bc7500 * f750 # erg/s/cm2
@@ -2769,7 +2773,7 @@ def calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=1, 
     return np.log10(Lbol750)
 
 def run_Lum_post(wl, y_obs,  Av_values, Rv_values, r_values, run_Lbol=False, run_Lacc=False,
-                        distance=1, bc7500=0, Fslab_norm=None, wl0=7500, n_bins=3,
+                        distance=1, bc7500=0, Fslab_norm=None, wl0=7500, n_bins=3, return_only_phot=False,
                         y_err=None, distance_err=None, final_unit=1, 
                         use_Hslab_veiling=False, use_one_Hslab_model=False, Tslab_values=None, logne_values=None, logtau0_values=None,
                         slab_kwargs={"wl_sp": 7500, "Zi":1, "wl_sp_unit":units.AA, "include_Hn":True, "Int_lam":True, "lam_unit":units.AA},
@@ -2778,7 +2782,7 @@ def run_Lum_post(wl, y_obs,  Av_values, Rv_values, r_values, run_Lbol=False, run
     # run Lbol
     if run_Lbol:
         Lbol_post = calculate_Lbol_post(wl, y_obs,  Av_values, Rv_values, r_values, distance=distance, bc7500=bc7500, wl0=wl0, n_bins=n_bins,
-                            y_err=y_err, distance_err=distance_err, final_unit=final_unit, 
+                            y_err=y_err, distance_err=distance_err, final_unit=final_unit, return_only_phot=return_only_phot,
                             use_Hslab_veiling=use_Hslab_veiling, use_one_Hslab_model=use_one_Hslab_model, 
                             Tslab_values=Tslab_values, logne_values=logne_values, logtau0_values=logtau0_values,
                             slab_kwargs=slab_kwargs)

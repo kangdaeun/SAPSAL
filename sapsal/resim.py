@@ -578,7 +578,7 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
         roi_valid = np.invert(resim_table['flag_Tout'].data[final_idx].astype(bool))
         resim_table['flag_resim'][final_idx] = roi_valid.astype(int)
         if verbose:
-            print(f"\tTotal {len(resim_table)} models to run.")
+            print(f"\tTotal {len(resim_table_part)} FRAPPE models to run.")
             print(f"\t{np.sum(np.invert(roi_valid))} models fail. Success: {np.sum(roi_valid)} models.")
         
         # return resim_table
