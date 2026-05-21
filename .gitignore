@@ -2,6 +2,7 @@
 sapsal/Slab_T7_N13_t1_n750.png
 sapsal/Slab_T7_N13_t1_n750.txt
 ess_files/Saliency_map.py
+ess_files/Saliency_map_ver1.py
 ess_files/eval_network_veilg0p1.py
 ess_files/feature_importance_multi.py
 ess_files/feature_importance_new.py
@@ -18,6 +19,8 @@ ess_files/plot_Ddistribution.py
 ess_files/test_classIII_stars.py
 ess_files/feature_importance.py 
 ess_files/train_ftnet.py 
+ess_files/feature_importance_v2.py
+ess_files/new_accuracy_test_ver3.py
 
 
 # sapsal/FRAPPE/
