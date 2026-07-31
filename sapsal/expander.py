@@ -1475,17 +1475,22 @@ def find_map_zone(posterior, llike, robust_unc=True, #config=None,
     N_post = posterior.shape[0]
 
 
-    threshold = (n_sig_threshold**2)/2.0 # in log-likelihood unit, 2-sigma corresponds to 4.
+    threshold = (n_sig_threshold**2)/2.0 # in log-likelihood unit, 2-sigma corresponds to 2.
 
     # Find High Probability zone (HPZ) 
-    roi_unc = llike > np.max(llike) - threshold
+    LLmax = np.max(llike); LL2nd = np.sort(llike)[::-1][1]
+    if LLmax - LL2nd >= threshold:
+        if verbose:
+            print(f"Warning: The log-likelihood difference between the best and second best sample is {LLmax - LL2nd:.2f}, which is larger than the threshold of {threshold:.2f} for {n_sig_threshold:g}-sigma. For HPZ, we use the second best log-likelihood as max-likelihood to include more samples in the HPZ.")
+            LLmax = LL2nd
+    roi_unc = llike > LLmax - threshold
     sig_step = 0.1
     while np.sum(roi_unc) < min_uncsample_fraction*N_post and n_sig_threshold < 3.0:
         if verbose:
             print(f"Warning: The number of samples in the uncertainty region is less than {min_uncsample_fraction*100:.1f}% of total samples. Increase the sigma threshold from {n_sig_threshold:g} to {n_sig_threshold+sig_step:g}.")
         n_sig_threshold += sig_step
         threshold = (n_sig_threshold**2)/2.0 
-        roi_unc = llike > np.max(llike) - threshold # increase threshold to include more samples
+        roi_unc = llike > LLmax - threshold # increase threshold to include more samples
     # roi_unc = llike > np.sort(llike)[::-1][int(f_unc*N_post)] # use fraction of samples to determine the uncertainty region. This is more robust than using a fixed log-likelihood threshold, which may not correspond to the same number of samples in different cases.
 
     if weighted_medoid:
