@@ -11,8 +11,10 @@ Information on file names code names, etc
 from importlib import resources
 import os
 import zipfile
+import numpy as np
 
 from .cINN_config import read_config_from_file
+from .expander import convert_temp_to_sptnum, convert_temp_to_spt
 
 AVAILABLE_NET_CODES = ['v1_settl', 'v2_k25', 'v3_vis', 'v3_uv']
 
@@ -43,6 +45,48 @@ NETWORK_FILES = {
     'v3_vis': "v3_vis/v3_Vis_Net.pt",
     'v3_uv': "v3_uv/v3_UV_Net.pt"
     }
+
+NETWORK_TRAINING_RANGES = {
+    'v1_settl': {
+                'Teff':(2600, 7000),  'logTeff':(np.log10(2600), np.log10(7000)),
+                'logG': (2.5, 5.0),
+                'A_V': (0, 10),   
+                },
+
+    'v2_k25': {
+                'Teff':(2600, 7000),  'logTeff':(np.log10(2600), np.log10(7000)),
+                'logG': (2.5, 5.0),
+                'A_V': (0, 10),
+                'veil_r': (0,2),
+                'library': (0, 1), 
+            },
+    'v3_vis': {
+                'Teff':(2330, 7000),  'logTeff':(np.log10(2330), np.log10(7000)),
+                'logG': (2.5, 5.5),
+                'A_V': (0, 10),
+                'log_veil_r': (-4, 1), 'veil_r': (10**-4, 10**1),
+                'R_V': (2, 6),
+                'library': (-1, 1),  # -1: FRAPPE, 0: Settl, 1: Dusty
+                'Tslab': (5000, 11000),
+                'log_ne': (11, 16),
+                'log_tau0':(np.log10(0.01), np.log10(5)),
+                'log_Fslab':(3.9, 4.32),
+                # 'SpTind': (convert_temp_to_sptnum(2330), convert_temp_to_sptnum(7000)), # SpTind of 2330 is larger than that of 7000K
+                # 'SpT': (convert_temp_to_spt(2330, option='Tpl')[:4], convert_temp_to_spt(7000, option='Tpl')[:4]),
+                },
+    'v3_uv': {
+                'Teff':(2330, 7000),  'logTeff':(np.log10(2330), np.log10(7000)),
+                'logG': (2.5, 5.5),
+                'A_V': (0, 10),
+                'log_veil_r': (-4, 1), 'veil_r': (10**-4, 10**1),
+                'R_V': (2, 6),
+                'library': (-1, 1),  # -1: FRAPPE, 0: Settl, 1: Dusty
+                'Tslab': (5000, 11000),
+                'log_ne': (11, 16),
+                'log_tau0':(np.log10(0.01), np.log10(5)),
+                'log_Fslab':(3.9, 4.32),
+            }         
+    }   
 
 
 
