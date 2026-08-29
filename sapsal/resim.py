@@ -233,10 +233,14 @@ PHOENIX_GRID_FILES = {
     'Dusty_new': {
 		    'MUSE':"MUSE_BT-Dusty_Fb_SynthSpecDF_20250904.pkl.gz", # new Dusty MUSE
             'X-shooter':"XS_BT-Dusty_Fb_SynthSpecDF_20260201.pkl.gz" # new Dusty X-Shotter
-            },     
+            },  
+    'Settl_AGSS2009': { # Settl for hotter stars (6800-9000, 2.5-5.0)
+                'MUSE': "MUSE_BT-Settl-AGSS2009_Fb_SynthSpecDF_20260731.pkl.gz", # 
+                'X-shooter': "XS_BT-Settl-AGSS2009_Fb_SynthSpecDF_20260731.pkl.gz" #
+               },   
 }
 
-def prepare_phoenix_grid(grid_names = ['Settl', 'Dusty', 'Settl_new', 'Dusty_new'], wl_grid = 'X-shooter'):
+def prepare_phoenix_grid(grid_names = ['Settl', 'Dusty', 'Settl_new', 'Dusty_new', 'Settl_AGSS2009'], wl_grid = 'X-shooter'):
     """
     Load appropirate Phoenix interpolation grid: XS/MUSE range, which library?
     grid_names: list of grid key names to load (related to PHOENIX library)
@@ -267,6 +271,9 @@ def prepare_phoenix_grid(grid_names = ['Settl', 'Dusty', 'Settl_new', 'Dusty_new
                             'Teff': (df['Teff'].min(), df['Teff'].max()),
 							'logTeff': (np.log10(df['Teff'].min()), np.log10(df['Teff'].max()))
                             }
+        # change g range for AGSS2009
+        if key=='Settl_AGSS2009':
+            db_range_dic[key]['logG'] = (3.0, 5.0)
 
     # db_range_dic['Settl']={
     #         'Teff':[2600, 7000],
@@ -375,6 +382,7 @@ def prepare_frappe_grid( wl_grid = 'X-shooter', only_range=False, verbose=False 
 def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix', phoenix_type='SpDx', 
                         #   use_FRAPPE=False, use_phoenix=True, use_SpDx=True, use_SpD=False, 
                           clip_logG = True, fixed_logg=4.0, lib_out_error=False,
+                          use_hotter_settl=True,
                           verbose = False):
     """
     Get parameter table to run and process parameters runnable for resimulation. 
@@ -387,8 +395,10 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
         param_table must include 'library'
     clip_logG: bool. if True, clip log g to be in the range of the model grid when log g is out of range. only for phoenix grid.
     fixed_logg: 4.0, This only applies for phoenix models, if log g is not in param_table 
-
-    This does not actually use data in phoexn/frappe grids, only check the param ranges.
+    lib_out_error: bool. if True, raise error when library is neither phoenix nor frappe. only for grid_model='phoenix_and_frappe'
+    use_hotter_settl: bool. if True, use Settl_AGSS2009 for hotter stars (Teff>7000K). 
+                        only for phoenix grid & phoenix_type=SpDx. In this case, logg is automatically clipped to [3.0, 5.0]
+    This does not actually use data in phoenix/frappe grids, only check the param ranges.
     
     added flags:
     flag_resim = 1 : can run resimulation / 0 : fail
@@ -463,6 +473,8 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
             settl_name = 'Settl_new'
             dusty_name = 'Dusty_new'
             grid_names = [settl_name, dusty_name]
+            if use_hotter_settl:
+                grid_names.append('Settl_AGSS2009')
         else:
             sys.exit("Currently only SpD and SpDx types are supported for phoenix_type")
 
@@ -474,8 +486,9 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
         lib = resim_table_part['library']
         roi_settl = np.around(lib)==0; roi_dusty = np.around(lib)==1
                     
-        settl_range = resim_db_range_dic[settl_name]
-        dusty_range = resim_db_range_dic[dusty_name]
+        settl_range = resim_db_range_dic[settl_name].copy()
+        dusty_range = resim_db_range_dic[dusty_name].copy()
+        # 2026.07.31 added Settl_AGSS2009 grid for hotter stars <= 9000K. but need to clip g 3.0-5.0
         
         # Check log g extrapolation
         roi_logg_out_settl = roi_settl * np.logical_or(resim_table_part['logG']>settl_range['logG'][1], resim_table_part['logG']<settl_range['logG'][0])
@@ -498,10 +511,21 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
                
         # cannot make resim: T extrapolation
         roi_tout_settl = roi_settl*np.logical_or(resim_table_part['logTeff']>settl_range['logTeff'][1], resim_table_part['logTeff']<settl_range['logTeff'][0])
+        if use_hotter_settl:
+            lTmax = resim_db_range_dic['Settl_AGSS2009']['logTeff'][1]
+            roi_hot_settl = roi_settl*np.logical_and(resim_table_part['logTeff']<=lTmax, resim_table_part['logTeff']>settl_range['logTeff'][1])
+            if np.sum(roi_hot_settl)>0:
+                if verbose:
+                    print("\tUse Settl-AGSS2009 for T>7000K: %d models.\n\tClip log g (3.0-5.0)"%np.sum(roi_hot_settl))
+                # clip logg for Hot settl
+                resim_table['logG'][final_idx[roi_hot_settl]] = np.clip(resim_table_part['logG'][roi_hot_settl], a_min=3.0, a_max=5.0)    
+                # Even out of AGSS2009 range
+                roi_tout_settl = roi_settl*np.logical_or(resim_table_part['logTeff']>lTmax, resim_table_part['logTeff']<settl_range['logTeff'][0])
         roi_settl[roi_tout_settl] = False
+
         roi_tout_dusty = roi_dusty*np.logical_or(resim_table_part['logTeff']>dusty_range['logTeff'][1], resim_table_part['logTeff']<dusty_range['logTeff'][0])
         roi_dusty[roi_tout_dusty] = False
-        # for dusty out case. if T in Settl. then change to settl (do not change library in resim_table)
+        # for dusty out case. if T in Settl (<=7000K). then change to settl (do not change library in resim_table)
         roi_tout_dusty_settl = roi_tout_dusty * np.logical_and(resim_table_part['logTeff']<=settl_range['logTeff'][1], resim_table_part['logTeff']>=settl_range['logTeff'][0])
         roi_settl[roi_tout_dusty_settl] = True
         # add flag
@@ -585,10 +609,12 @@ def prepare_resim_params(param_table, wl_grid='X-shooter', grid_model='phoenix',
     # else:
     #     sys.exit("Currently only 'phoenix' and 'frappe' are supported for grid_model")
 
-        # If lib=-1, T>T_frappe (Tout) but T<7000
+        # If lib=-1, T>T_frappe (Tout) but T<7000 -> now T < 9000
         if grid_model=='phoenix_and_frappe' and np.sum(roi_spt_ext) > 0:
-            print('\t !!changed applied')
+            print('\t !!changes applied')
             settl_name = 'Settl_new' #if phoenix_type=='SpD' else 'Settl'
+            if use_hotter_settl:
+                settl_name = 'Settl_AGSS2009'
             ASS_dic, resim_db_range_dic = prepare_phoenix_grid(grid_names = [settl_name], wl_grid = wl_grid)
             settl_range = resim_db_range_dic[settl_name]
 
@@ -693,11 +719,11 @@ def run_photosphere(resim_table,  wl_grid='X-shooter', grid_model='phoenix', pho
         if phoenix_type=='SpD':
             settl_name = 'Settl'
             dusty_name = 'Dusty'
-            grid_names = [settl_name, dusty_name]
+            grid_names = [settl_name, dusty_name, 'Settl_AGSS2009']
         elif phoenix_type=='SpDx':
             settl_name = 'Settl_new'
             dusty_name = 'Dusty_new'
-            grid_names = [settl_name, dusty_name]
+            grid_names = [settl_name, dusty_name, 'Settl_AGSS2009']
         else:
             sys.exit("Currently only SpD and SpDx types are supported for phoenix_type")
         
@@ -705,16 +731,19 @@ def run_photosphere(resim_table,  wl_grid='X-shooter', grid_model='phoenix', pho
        
         # resim_kwargs = {'normalization':None, 'logint_flux':False} # kwargs for SynthOptSpec (Not used anymore)
         roi_resim = resim_table_part['flag_resim']
-        roi_settl = resim_table_part['flag_resim'] * roi_resim # Settl only runnable
+        roi_settl = resim_table_part['flag_settl'] * roi_resim # Settl only runnable
         roi_dusty = resim_table_part['flag_dusty'] * roi_resim # Dusty only runnable
         if 'Teff' not in resim_table_part.colnames and 'logTeff' in resim_table_part.colnames:
             resim_table_part['Teff'] = 10**resim_table_part['logTeff']
+        # if grid_model == 'phoenix_and_frappe' and phoenix_type=='SpDx':
+        roi_settl_hot = roi_settl * (resim_table_part['Teff']>resim_db_range_dic[settl_name]['Teff'][1]) # Settl_AGSS2009 for T>7000K # other cases, already filted by roi_settl
+        roi_settl = roi_settl * (resim_table_part['Teff']<=resim_db_range_dic[settl_name]['Teff'][1])
 
         if verbose:
             print('\tRun Phoenix')
 
         # Assuming only settl and dusty for each
-        for name, roi in zip([settl_name, dusty_name], [roi_settl.astype(bool), roi_dusty.astype(bool)]):
+        for name, roi in zip(['Settl_AGSS2009', settl_name, dusty_name], [roi_settl_hot.astype(bool), roi_settl.astype(bool), roi_dusty.astype(bool)]):
             if np.sum(roi)==0: # nothing to run
                 continue
             idx_part = final_idx[roi]
@@ -1069,7 +1098,7 @@ def get_normalize_factor(spec_resim, config, wl_grid='X-shooter',return_outputs=
 # Run all at once. Cannot change slab kwargs here. Simpliefied version. Not necessary.
 def run_resimulation(param_table, wl_grid='MUSE', grid_model='phoenix', phoenix_type='SpDx', config=None,
                     return_all=False, return_veil=False, return_normalization=False, # 효율적인 셋업을 디폴트로
-                    clip_logG=True, fixed_logg=4.0, # kwarg for prepare_resim_params
+                    clip_logG=True, fixed_logg=4.0, use_hotter_settl=True, # kwarg for prepare_resim_params
                     rv_values=None, use_multiprocessing=False, N_cpu=None,  # kwarg for run_veiling_and_extinction
                     use_Hslab_veiling=True, use_one_Hslab_model=False, run_veil=False, run_extinct=False, # if config is set, these will be controlled by config
                     verbose=False):
@@ -1136,7 +1165,7 @@ def run_resimulation(param_table, wl_grid='MUSE', grid_model='phoenix', phoenix_
 
     # start with preparing resim_table
     resim_table = prepare_resim_params(param_table, wl_grid=wl_grid, grid_model=grid_model, phoenix_type=phoenix_type, 
-                                       clip_logG=clip_logG, fixed_logg=fixed_logg, verbose=verbose) 
+                                       clip_logG=clip_logG, fixed_logg=fixed_logg, use_hotter_settl=use_hotter_settl, verbose=verbose) 
     # Run photosphere
     phot_resim = run_photosphere(resim_table, wl_grid=wl_grid, grid_model=grid_model, verbose=verbose)
     
