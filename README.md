@@ -4,9 +4,9 @@
 
 # SAPSAL
 
-**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young stars (M-F types) from their optical spectra. The overall SAPSAL project aims to develop a deep learning tool for analyzing numerous stellar spectra observed by VLT/MUSE (4750 - 9350Å), but from SAPSAL-v3 networks, the usage is not limited to VLT/MUSE data.
+**SAPSAL (Star And Protoplanetary disk Spectroscopic data AnaLyzer with neural networks)** is a deep learning framework for spectral classification of young stars (M-F types) from their optical spectra. The overall SAPSAL project aims to develop a deep learning tool to analyze numerous stellar spectra observed by VLT/MUSE (4750 - 9350Å). From SAPSAL-v3, the networks are designed to be universal and instrument-independent, and the application is not limited to VLT/MUSE data.
 
-The networks are built on the conditional invertible neural network (cINN) architecture, which enables getting a full posterior distribution of the parameters, not just a single prediction.
+The networks are built on the conditional invertible neural network (cINN) architecture, which provides the full posterior distribution of the parameters and enables robust uncertainty measurements.
 
 SAPSAL is named after a Korean dog breed, the SAPSAL dog.
 
@@ -14,7 +14,7 @@ SAPSAL is named after a Korean dog breed, the SAPSAL dog.
 This repository provides Python code to build and run the SAPSAL networks introduced in the following papers:
 - [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html)
 - [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html)
-- Kang et al. 2026, _in prep._
+- Kang et al. 2026, _submitted_
 
 
 ## Installation requirements
@@ -115,7 +115,7 @@ MUSE wavelength for the whole range:
 If you use SAPSAL networks in your work, please cite the papers below.
 - [Kang et al. 2023](https://www.aanda.org/articles/aa/full_html/2023/06/aa46345-23/aa46345-23.html)
 - [Kang et al. 2025](https://www.aanda.org/articles/aa/full_html/2025/05/aa50394-24/aa50394-24.html)
-- Kang et al. 2026, _in prep._
+- Kang et al. 2026, _submitted_
 - for all networks: [Ardizzone et al. 2019b](https://arxiv.org/abs/1907.02392), [Ardizzone et al. 2021](https://arxiv.org/abs/2105.02104)
 
 
