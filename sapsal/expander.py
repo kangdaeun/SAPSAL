@@ -1452,6 +1452,7 @@ def find_map_zone(posterior, llike, robust_unc=True, #config=None,
                     confidence_unc=0.95, # robust_err mode 
                     # f_unc=0.15, # fraction of samples in the uncertainty region
                     n_sig_threshold = 2.0, # threshold for the first filtering of uncertainty region (in log-likelihood unit). default is 2.0, which corresponds to 2-sigma
+                    max_n_sig_threshold = 3.0, # maximum threshold for the first filtering of uncertainty region 
                     min_uncsample_fraction=0.01, # minimum fraction of samples in the uncertainty region (to avoid too small sample size for robust_unc)
                     # n_sig_wmd = 1.0, 
                     # min_sample_wmd = None,
@@ -1485,13 +1486,16 @@ def find_map_zone(posterior, llike, robust_unc=True, #config=None,
             LLmax = LL2nd
     roi_unc = llike > LLmax - threshold
     sig_step = 0.1
-    while np.sum(roi_unc) < min_uncsample_fraction*N_post and n_sig_threshold < 3.0:
+    while np.sum(roi_unc) < min_uncsample_fraction*N_post and n_sig_threshold < max_n_sig_threshold: # default maximum 3-sigma
         if verbose:
             print(f"Warning: The number of samples in the uncertainty region is less than {min_uncsample_fraction*100:.1f}% of total samples. Increase the sigma threshold from {n_sig_threshold:g} to {n_sig_threshold+sig_step:g}.")
         n_sig_threshold += sig_step
         threshold = (n_sig_threshold**2)/2.0 
         roi_unc = llike > LLmax - threshold # increase threshold to include more samples
     # roi_unc = llike > np.sort(llike)[::-1][int(f_unc*N_post)] # use fraction of samples to determine the uncertainty region. This is more robust than using a fixed log-likelihood threshold, which may not correspond to the same number of samples in different cases.
+
+    if np.sum(roi_unc) == 0:
+        raise ValueError("No samples in the HPZ (high-probability zone). Please check the log-likelihood values and the threshold settings.")
 
     if weighted_medoid:
         # if min_sample_wmd is None:
