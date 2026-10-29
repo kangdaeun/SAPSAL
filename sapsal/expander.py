@@ -763,7 +763,10 @@ def convert_temp_to_sptnum(teff, option='Tpl', out_nan=True):
         # return ref_sptind[i_tmax]
     
     arg_min = np.argmin(abs(ref_temp-teff))
-    if ref_temp[arg_min] >= teff:
+    if  ref_temp[arg_min] == teff:
+        return ref_sptind[arg_min]
+    
+    if ref_temp[arg_min] > teff:
         ind_right = arg_min # higher temp
         ind_left = arg_min +1 # sort from High to Low Teff
     else:
@@ -799,8 +802,10 @@ def convert_sptnum_to_temp(sptnum, option='Tpl', out_nan=True):
         else: sys.exit("Out of the range: %s"%spt_desc_dic[option])
         # return ref_temp[i_tmin]
     
-    arg_min = np.argmin(abs(ref_sptind-sptnum))
-    if ref_sptind[arg_min] >= sptnum:
+    arg_min = np.argmin(np.abs(ref_sptind-sptnum))
+    if ref_sptind[arg_min] == sptnum:
+        return ref_temp[arg_min]
+    if ref_sptind[arg_min] > sptnum:
         ind_right = arg_min # larger index 
         ind_left = arg_min -1 # sort from small to large index
     else:
