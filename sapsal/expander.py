@@ -233,13 +233,18 @@ def get_spec_index(y_names, get_loc=False, use_bool=False):
     else:
         return np.array([int(s[1:]) for i, s in enumerate(y_names) if s.startswith('l') and s[1:].isdigit()]) 
 
-def cardelli_extinction(wave, Av, Rv):
-    # If you use it to apply a reddening to a spectrum, multiply it for the result of
-    # this function, while you should divide by it in the case you want to deredden it.
-    
-    # here Av and Rv should be scalr values -> 2025.07.13: changed. Av and Rv can be scalar or 1D array.
-    # wave must be 1D array
 
+def cardelli_extinction(wave, Av, Rv):
+    """
+    Calculate the extinction ratio A_lambda / A_V using the Cardelli, Clayton, & Mathis (1989) extinction law.
+
+    Av and Rv can be scalar or 1D array. Length of Av and Rv means the number of observations.
+    wave must be scalar or 1D array. The same wavelength will be applied to all observations.
+
+    If you use it to apply a reddening to a spectrum, multiply it for the result of this function, 
+    while you should divide by it in the case you want to deredden it.
+    """
+    
     #ebv = Av/Rv
     wave  = np.atleast_1d(wave)
     Av_arr = np.atleast_1d(Av)
