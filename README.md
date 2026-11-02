@@ -50,7 +50,7 @@ The following packages are required to run the scripts in this repository:
 
 ## How to use pre-trained networks
 
-Once you have cloned the SAPSAL repository, you can load and use the pre-trained networks. 
+After cloning the SAPSAL repository, you can load and use the pre-trained networks. 
 Below is the list of available SAPSAL networks (2026. 4. 20).
 
 
@@ -79,7 +79,7 @@ print("Network codes available:", sapsal.io.AVAILABLE_NET_CODES)
 config = sapsal.io.load_pretrained_network('v3_vis', verbose=True)
 ```
 
-For more detailed instructions for loading and using the network, see SAPSAL_Tutorial.ipynb in examples/.
+For more detailed instructions for loading and using the network, see SAPSAL_Tutorial.ipynb in examples/. You can run the tutorial with Google Colab.
 This explains:
 - how to read the network
 - how to prepare input data from your observations
